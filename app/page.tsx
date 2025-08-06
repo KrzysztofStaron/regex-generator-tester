@@ -43,7 +43,10 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center space-x-4">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="https://github.com" className="flex items-center space-x-2">
+              <Link
+                href="https://github.com/KrzysztofStaron/regex-generator-tester"
+                className="flex items-center space-x-2"
+              >
                 <Github className="w-4 h-4" />
                 <span>GitHub</span>
               </Link>
@@ -263,7 +266,10 @@ export default function LandingPage() {
               className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 px-8 py-3 text-lg"
               asChild
             >
-              <Link href="https://github.com" className="flex items-center space-x-2">
+              <Link
+                href="https://github.com/KrzysztofStaron/regex-generator-tester"
+                className="flex items-center space-x-2"
+              >
                 <Star className="w-5 h-5" />
                 <span>Star on GitHub</span>
               </Link>
