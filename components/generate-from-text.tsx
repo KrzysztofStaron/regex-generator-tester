@@ -264,7 +264,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                   : "bg-zinc-700"
               }`}
             >
-              1
+              <span className="text-white font-bold">1</span>
             </div>
             <span>Describe Pattern</span>
           </div>
@@ -302,7 +302,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                   : "bg-zinc-800"
               }`}
             >
-              2
+              <span className="text-white font-bold">2</span>
             </div>
             <span>Review Test Cases</span>
           </div>
@@ -310,21 +310,41 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
 
           <div
             className={`flex items-center gap-2 transition-colors ${
-              finalRegex ? "cursor-pointer hover:text-green-300" : "cursor-not-allowed opacity-50"
-            } ${currentStep === "results" ? "text-green-400" : finalRegex ? "text-zinc-400" : "text-zinc-600"}`}
+              isGeneratingRegex
+                ? "cursor-not-allowed opacity-40"
+                : finalRegex
+                ? "cursor-pointer hover:text-green-300"
+                : "cursor-not-allowed opacity-50"
+            } ${
+              isGeneratingRegex
+                ? "text-zinc-500"
+                : currentStep === "results"
+                ? "text-green-400"
+                : finalRegex
+                ? "text-zinc-400"
+                : "text-zinc-600"
+            }`}
             onClick={() => {
-              // Can only go to results if we have generated a regex
-              if (finalRegex) {
+              // Can only go to results if we have generated a regex and not currently generating
+              if (finalRegex && !isGeneratingRegex) {
                 setCurrentStep("results");
               }
             }}
           >
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                finalRegex ? "hover:opacity-80" : ""
-              } ${currentStep === "results" ? "bg-green-500" : finalRegex ? "bg-zinc-700" : "bg-zinc-800"}`}
+                isGeneratingRegex ? "bg-zinc-800 animate-pulse" : finalRegex ? "hover:opacity-80" : ""
+              } ${
+                isGeneratingRegex
+                  ? "bg-zinc-800"
+                  : currentStep === "results"
+                  ? "bg-green-500"
+                  : finalRegex
+                  ? "bg-zinc-700"
+                  : "bg-zinc-800"
+              }`}
             >
-              3
+              <span className="text-white font-bold">3</span>
             </div>
             <span>Generate & Test</span>
           </div>
