@@ -72,7 +72,7 @@ export async function generateTestCasesAction(description: string): Promise<Test
 
 export async function generateRegexFromTestCasesAction(
   description: string,
-  testCases: Array<{ text: string; isValid: boolean }>,
+  testCases: Array<{ text: string; shouldMatch: boolean }>,
   previousAttempt?: { regex: string; failures: string[] }
 ): Promise<StepByStepResult> {
   if (!description.trim()) {

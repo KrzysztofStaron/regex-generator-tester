@@ -168,14 +168,17 @@ export async function generateTestCases(description: string): Promise<TestCasesG
 // Step 2: Generate regex from description and test cases
 export async function generateRegexFromTestCases(
   description: string,
-  testCases: Array<{ text: string; isValid: boolean }>,
+  testCases: Array<{ text: string; shouldMatch: boolean }>,
   previousAttempt?: { regex: string; failures: string[] }
 ): Promise<StepByStepResult> {
   try {
     const contextMessage = previousAttempt
-      ? `Previous regex "${previousAttempt.regex}" failed with these issues:\n${previousAttempt.failures.join(
-          "\n"
-        )}\n\nImprove the regex to fix these problems.`
+      ? `\n\nPREVIOUS ATTEMPT FAILED:
+Previous regex: "${previousAttempt.regex}"
+Failed test cases:
+${previousAttempt.failures.join("\n")}
+
+CRITICAL: Analyze why the previous regex failed and create an improved version that specifically addresses these failures.`
       : "";
 
     const response = await openai.chat.completions.create({
@@ -183,33 +186,59 @@ export async function generateRegexFromTestCases(
       messages: [
         {
           role: "system",
-          content: `You are a regex expert. Generate a regex pattern that works correctly with the provided test cases.
-          
-          ${contextMessage}
-          
-          Return a JSON object with:
-          {
-            "regex": the regex pattern (escaped for JavaScript),
-            "explanation": plain English explanation of the regex,
-            "confidence": number 0-100
-          }
-          
-          Make sure the regex is practical and handles the test cases correctly.`,
-        },
-        {
-          role: "user",
-          content: `Generate a regex for: ${description}
-          
-          Test cases that must work:
-          ${testCases.map(tc => `${tc.isValid ? "✓" : "✗"} "${tc.text}"`).join("\n")}`,
+          content: `You are an expert regex engineer with 20+ years of experience. Your task is to create a precise, efficient regex pattern that correctly matches or rejects ALL provided test cases.
+
+CRITICAL REQUIREMENTS:
+1. **Perfect Accuracy**: The regex MUST pass ALL test cases exactly as specified
+2. **JavaScript Compatibility**: Use only JavaScript-compatible regex syntax
+3. **Proper Escaping**: Escape all special characters correctly for JavaScript
+4. **Efficiency**: Prefer non-capturing groups (?:) over capturing groups when possible
+5. **Clarity**: Use word boundaries (\\b) when appropriate to avoid partial matches
+6. **Robustness**: Handle edge cases and ensure the pattern is practical for real-world use
+7. **Proper JSON**: Return a JSON object with the regex, explanation, and confidence, no other text or comments
+
+ANALYSIS APPROACH:
+1. First, analyze the pattern described: "${description}"
+2. Examine each test case carefully:
+${testCases
+  .map((tc, i) => `   ${i + 1}. "${tc.text}" - ${tc.shouldMatch ? "SHOULD MATCH" : "SHOULD NOT MATCH"}`)
+  .join("\n")}
+3. Identify the common patterns and constraints
+4. Design a regex that captures the essence while being precise
+
+REGEX DESIGN PRINCIPLES:
+- Use anchors (^, $) when you need to match the entire string
+- Use word boundaries (\\b) for word-based patterns
+- Use character classes [a-z] instead of alternation (a|b|c) when possible
+- Use quantifiers (*, +, ?, {n,m}) appropriately
+- Escape special regex characters: . * + ? ^ $ { } ( ) [ ] \\ | /
+- Use non-capturing groups (?:...) for grouping without capturing
+
+${contextMessage}
+
+RESPONSE FORMAT:
+Return a JSON object with:
+- "regex": The complete regex pattern (properly escaped for JavaScript)
+- "explanation": Clear explanation of how the regex works, breaking down each part
+- "confidence": Your confidence level (0-100) based on how well you think it will work
+
+EXAMPLE OUTPUT:
+{
+  "regex": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b",
+  "explanation": "This regex matches email addresses by requiring: word boundary, local part with alphanumeric and common email characters, @ symbol, domain with alphanumeric and dots, TLD of 2+ letters, word boundary",
+  "confidence": 95
+}`,
         },
       ],
-      temperature: 0.3,
+      temperature: 0.2,
       response_format: { type: "json_object" },
     });
 
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No response from AI");
+
+    console.log("RAAAAAAAAAAAAAAAAAAAAAAW: ", content);
+
     const result = parseAIResponse(content);
 
     // Test the generated regex against the test cases
@@ -221,7 +250,7 @@ export async function generateRegexFromTestCases(
 
       for (const testCase of testCases) {
         const actualResult = regex.test(testCase.text);
-        const passed = testCase.isValid === actualResult;
+        const passed = testCase.shouldMatch === actualResult;
 
         if (!passed) {
           allTestsPassed = false;
@@ -229,7 +258,7 @@ export async function generateRegexFromTestCases(
 
         testResults.push({
           text: testCase.text,
-          isValid: testCase.isValid,
+          isValid: testCase.shouldMatch,
           actualResult,
           passed,
         });
@@ -242,7 +271,7 @@ export async function generateRegexFromTestCases(
       for (const testCase of testCases) {
         testResults.push({
           text: testCase.text,
-          isValid: testCase.isValid,
+          isValid: testCase.shouldMatch,
           actualResult: false,
           passed: false,
         });

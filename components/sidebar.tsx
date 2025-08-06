@@ -34,6 +34,11 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           icon: Search,
           description: "Reverse mode",
         },
+      ],
+    },
+    {
+      group: "Other",
+      items: [
         {
           id: "library",
           label: "Pattern Library",

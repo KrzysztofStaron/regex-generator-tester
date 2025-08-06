@@ -99,7 +99,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
     try {
       const testCasesData = generatedTestCases.map(tc => ({
         text: tc.text,
-        isValid: tc.isValid,
+        shouldMatch: tc.isValid,
       }));
 
       const result = await generateRegexFromTestCasesAction(description, testCasesData, previousAttempt);
@@ -135,8 +135,8 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
     }
   };
 
-  // Retry workflow - go back to test cases with context
-  const retryWorkflow = () => {
+  // Retry workflow - regenerate with context from failures
+  const retryWorkflow = async () => {
     if (finalRegex && testResults.length > 0) {
       const failures = testResults
         .filter(tr => !tr.passed)
@@ -148,14 +148,49 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
         );
 
       setPreviousAttempt({ regex: finalRegex, failures });
-    }
 
-    setCurrentStep("test-cases");
-    setFinalRegex("");
-    setRegexExplanation("");
-    setTestResults([]);
-    setAllTestsPassed(false);
-    toast.info("Retrying generation with improved context...");
+      // Immediately regenerate with the failure context
+      setIsGeneratingRegex(true);
+      try {
+        const testCasesData = generatedTestCases.map(tc => ({
+          text: tc.text,
+          shouldMatch: tc.isValid,
+        }));
+
+        const result = await generateRegexFromTestCasesAction(description, testCasesData, {
+          regex: finalRegex,
+          failures,
+        });
+
+        setFinalRegex(result.regex);
+        setRegexExplanation(result.explanation);
+        setConfidence(result.confidence);
+        setAllTestsPassed(result.allTestsPassed);
+
+        // Convert test results to our format
+        const resultsWithIds = result.testResults.map((tr, index) => ({
+          id: (index + 1).toString(),
+          text: tr.text,
+          isValid: tr.isValid,
+          actualResult: tr.actualResult,
+          passed: tr.passed,
+        }));
+
+        setTestResults(resultsWithIds);
+
+        if (result.allTestsPassed) {
+          toast.success("Retry successful! All tests now pass.");
+        } else {
+          toast.warning("Regex improved but some tests still fail.");
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        toast.error(`Retry failed: ${errorMessage}`);
+        console.error("Retry generation error:", error);
+      } finally {
+        setIsGeneratingRegex(false);
+      }
+    }
   };
 
   // Start over completely
@@ -494,7 +529,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                   {!allTestsPassed && (
                     <Button variant="destructive" size="sm" onClick={retryWorkflow} disabled={isGeneratingRegex}>
                       <RotateCcw className="w-4 h-4 mr-2" />
-                      Retry Generation
+                      {isGeneratingRegex ? "Retrying..." : "Retry Generation"}
                     </Button>
                   )}
                   <Button
