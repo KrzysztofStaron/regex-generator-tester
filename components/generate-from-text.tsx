@@ -243,16 +243,20 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
         {/* Progress indicator */}
         <div className="mt-6 flex items-center gap-4">
           <div
-            className={`flex items-center gap-2 ${
+            className={`flex items-center gap-2 cursor-pointer transition-colors hover:text-blue-300 ${
               currentStep === "description"
                 ? "text-blue-400"
                 : currentStep === "test-cases" || currentStep === "results"
                 ? "text-green-400"
                 : "text-zinc-400"
             }`}
+            onClick={() => {
+              // Can always go back to description
+              setCurrentStep("description");
+            }}
           >
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors hover:opacity-80 ${
                 currentStep === "description"
                   ? "bg-blue-500"
                   : currentStep === "test-cases" || currentStep === "results"
@@ -267,21 +271,35 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
           <ArrowRight className="w-4 h-4 text-zinc-500" />
 
           <div
-            className={`flex items-center gap-2 ${
+            className={`flex items-center gap-2 transition-colors ${
+              generatedTestCases.length > 0 ? "cursor-pointer hover:text-blue-300" : "cursor-not-allowed opacity-50"
+            } ${
               currentStep === "test-cases"
                 ? "text-blue-400"
                 : currentStep === "results"
                 ? "text-green-400"
-                : "text-zinc-400"
+                : generatedTestCases.length > 0
+                ? "text-zinc-400"
+                : "text-zinc-600"
             }`}
+            onClick={() => {
+              // Can only go to test cases if we have generated them
+              if (generatedTestCases.length > 0) {
+                setCurrentStep("test-cases");
+              }
+            }}
           >
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                generatedTestCases.length > 0 ? "hover:opacity-80" : ""
+              } ${
                 currentStep === "test-cases"
                   ? "bg-blue-500"
                   : currentStep === "results"
                   ? "bg-green-500"
-                  : "bg-zinc-700"
+                  : generatedTestCases.length > 0
+                  ? "bg-zinc-700"
+                  : "bg-zinc-800"
               }`}
             >
               2
@@ -290,11 +308,21 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
           </div>
           <ArrowRight className="w-4 h-4 text-zinc-500" />
 
-          <div className={`flex items-center gap-2 ${currentStep === "results" ? "text-green-400" : "text-zinc-400"}`}>
+          <div
+            className={`flex items-center gap-2 transition-colors ${
+              finalRegex ? "cursor-pointer hover:text-green-300" : "cursor-not-allowed opacity-50"
+            } ${currentStep === "results" ? "text-green-400" : finalRegex ? "text-zinc-400" : "text-zinc-600"}`}
+            onClick={() => {
+              // Can only go to results if we have generated a regex
+              if (finalRegex) {
+                setCurrentStep("results");
+              }
+            }}
+          >
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                currentStep === "results" ? "bg-green-500" : "bg-zinc-700"
-              }`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                finalRegex ? "hover:opacity-80" : ""
+              } ${currentStep === "results" ? "bg-green-500" : finalRegex ? "bg-zinc-700" : "bg-zinc-800"}`}
             >
               3
             </div>
