@@ -2,6 +2,7 @@
 
 import {
   generateRegexFromDescription,
+  generateRegexFromDescriptionWithRetry,
   analyzeRegexPattern,
   generateRegexFromExamples,
   suggestRegexFix,
@@ -15,6 +16,14 @@ export async function generateRegexAction(description: string): Promise<RegexGen
   }
 
   return await generateRegexFromDescription(description);
+}
+
+export async function generateRegexWithRetryAction(description: string) {
+  if (!description.trim()) {
+    throw new Error("Description is required");
+  }
+
+  return await generateRegexFromDescriptionWithRetry(description, 3);
 }
 
 export async function analyzeRegexAction(pattern: string): Promise<RegexAnalysis> {

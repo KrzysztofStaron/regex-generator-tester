@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, AlertCircle, Info, Sparkles, Lightbulb, PlayCircle } from "lucide-react";
+import { Search, AlertCircle, Info, Sparkles, Lightbulb, PlayCircle, Check } from "lucide-react";
 import { RegexHighlighter } from "@/components/regex-highlighter";
 import { analyzeRegexAction, suggestFixAction } from "@/app/actions";
 import { toast } from "sonner";
@@ -130,7 +130,23 @@ export function AnalyzeRegex({ state, updateState }: AnalyzeRegexProps) {
                 </Button>
                 {suggestedFix && (
                   <div className="p-2 bg-zinc-800/50 rounded border border-green-500/30">
-                    <p className="text-green-400 text-xs mb-1">AI Suggested Fix:</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-green-400 text-xs">AI Suggested Fix:</p>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={() => {
+                          setRegex(suggestedFix);
+                          setError("");
+                          setSuggestedFix("");
+                          toast.success("Applied AI fix!");
+                        }}
+                        className="text-xs h-6 px-2"
+                      >
+                        <Check className="w-3 h-3 mr-1" />
+                        Apply
+                      </Button>
+                    </div>
                     <RegexHighlighter pattern={suggestedFix} className="text-green-400 text-xs" />
                   </div>
                 )}

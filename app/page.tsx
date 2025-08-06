@@ -16,6 +16,7 @@ export default function Home() {
   const [generateRegex, setGenerateRegex] = useState("");
   const [generateExplanation, setGenerateExplanation] = useState("");
   const [generateTestCases, setGenerateTestCases] = useState<any[]>([]);
+  const [generateGenerationSteps, setGenerateGenerationSteps] = useState<any[]>([]);
   const [generateIsGenerating, setGenerateIsGenerating] = useState(false);
 
   // Analyze tab state
@@ -72,6 +73,7 @@ user123+tag@site.org
               generatedRegex: generateRegex,
               explanation: generateExplanation,
               testCases: generateTestCases,
+              generationSteps: generateGenerationSteps,
               isGenerating: generateIsGenerating,
             }}
             updateState={updates => {
@@ -79,6 +81,7 @@ user123+tag@site.org
               if (updates.generatedRegex !== undefined) setGenerateRegex(updates.generatedRegex);
               if (updates.explanation !== undefined) setGenerateExplanation(updates.explanation);
               if (updates.testCases !== undefined) setGenerateTestCases(updates.testCases);
+              if (updates.generationSteps !== undefined) setGenerateGenerationSteps(updates.generationSteps);
               if (updates.isGenerating !== undefined) setGenerateIsGenerating(updates.isGenerating);
             }}
           />
@@ -169,6 +172,7 @@ user123+tag@site.org
               generatedRegex: generateRegex,
               explanation: generateExplanation,
               testCases: generateTestCases,
+              generationSteps: generateGenerationSteps,
               isGenerating: generateIsGenerating,
             }}
             updateState={updates => {
@@ -176,6 +180,7 @@ user123+tag@site.org
               if (updates.generatedRegex !== undefined) setGenerateRegex(updates.generatedRegex);
               if (updates.explanation !== undefined) setGenerateExplanation(updates.explanation);
               if (updates.testCases !== undefined) setGenerateTestCases(updates.testCases);
+              if (updates.generationSteps !== undefined) setGenerateGenerationSteps(updates.generationSteps);
               if (updates.isGenerating !== undefined) setGenerateIsGenerating(updates.isGenerating);
             }}
           />

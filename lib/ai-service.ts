@@ -27,60 +27,128 @@ export interface RegexGeneration {
   confidence: number;
 }
 
-export async function generateRegexFromDescription(description: string): Promise<RegexGeneration> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "anthropic/claude-3.5-sonnet",
-      messages: [
-        {
-          role: "system",
-          content: `You are a regex expert. Generate regex patterns based on natural language descriptions. 
-          Return a JSON object with:
-          - regex: the regex pattern (escaped for JavaScript)
-          - explanation: plain English explanation
-          - testCases: array of {text, isValid} objects (3 valid, 3 invalid examples)
-          - confidence: number 0-100
-          
-          Focus on practical, commonly used patterns.`,
-        },
-        {
-          role: "user",
-          content: `Generate a regex for: ${description}`,
-        },
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" },
-    });
+export interface GenerationStep {
+  step: number;
+  regex: string;
+  explanation: string;
+  testCases: Array<{
+    text: string;
+    isValid: boolean;
+    actualResult?: boolean;
+  }>;
+  confidence: number;
+  failedTests: number;
+  status: "success" | "failed" | "retrying";
+}
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error("No response from AI");
+export async function generateRegexFromDescriptionWithRetry(
+  description: string,
+  maxRetries: number = 3
+): Promise<{ steps: GenerationStep[]; finalResult: RegexGeneration }> {
+  const steps: GenerationStep[] = [];
+  let currentStep = 1;
 
-    const result = JSON.parse(content);
+  while (currentStep <= maxRetries) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "anthropic/claude-3.5-sonnet",
+        messages: [
+          {
+            role: "system",
+            content: `You are a regex expert. Generate regex patterns based on natural language descriptions. 
+            ${
+              currentStep > 1
+                ? `Previous attempt failed ${currentStep - 1} test(s). Please improve the regex to pass all tests.`
+                : ""
+            }
+            Return a JSON object with:
+            - regex: the regex pattern (escaped for JavaScript)
+            - explanation: plain English explanation
+            - testCases: array of {text, isValid} objects (3 valid, 3 invalid examples)
+            - confidence: number 0-100
+            
+            Focus on practical, commonly used patterns.`,
+          },
+          {
+            role: "user",
+            content: `Generate a regex for: ${description}`,
+          },
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+      });
 
-    // Validate test cases against the generated regex
-    if (result.testCases && Array.isArray(result.testCases)) {
-      try {
-        const regex = new RegExp(result.regex);
-        result.testCases = result.testCases.map(testCase => ({
-          ...testCase,
-          actualResult: regex.test(testCase.text),
-          isValid: testCase.isValid === regex.test(testCase.text),
-        }));
-      } catch (regexError) {
-        console.warn("Invalid regex generated:", result.regex, regexError);
-        result.testCases = result.testCases.map(testCase => ({
-          ...testCase,
-          actualResult: false,
-          isValid: false,
-        }));
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("No response from AI");
+
+      const result = JSON.parse(content);
+
+      // Validate test cases against the generated regex
+      let failedTests = 0;
+      if (result.testCases && Array.isArray(result.testCases)) {
+        try {
+          const regex = new RegExp(result.regex);
+          result.testCases = result.testCases.map(testCase => {
+            const actualResult = regex.test(testCase.text);
+            const isValid = testCase.isValid === actualResult;
+            if (!isValid) failedTests++;
+            return {
+              ...testCase,
+              actualResult,
+              isValid,
+            };
+          });
+        } catch (regexError) {
+          console.warn("Invalid regex generated:", result.regex, regexError);
+          result.testCases = result.testCases.map(testCase => ({
+            ...testCase,
+            actualResult: false,
+            isValid: false,
+          }));
+          failedTests = result.testCases.length;
+        }
       }
-    }
 
-    return result;
-  } catch (error) {
-    console.error("AI generation error:", error);
-    throw new Error("Failed to generate regex");
+      const step: GenerationStep = {
+        step: currentStep,
+        regex: result.regex,
+        explanation: result.explanation,
+        testCases: result.testCases,
+        confidence: result.confidence,
+        failedTests,
+        status: failedTests === 0 ? "success" : currentStep === maxRetries ? "failed" : "retrying",
+      };
+
+      steps.push(step);
+
+      // If all tests pass or we've reached max retries, return the result
+      if (failedTests === 0 || currentStep === maxRetries) {
+        return { steps, finalResult: result };
+      }
+
+      currentStep++;
+    } catch (error) {
+      console.error(`AI generation error on step ${currentStep}:`, error);
+      const errorStep: GenerationStep = {
+        step: currentStep,
+        regex: "",
+        explanation: "Failed to generate regex",
+        testCases: [],
+        confidence: 0,
+        failedTests: 0,
+        status: "failed",
+      };
+      steps.push(errorStep);
+      throw new Error("Failed to generate regex");
+    }
   }
+
+  throw new Error("Failed to generate regex after maximum retries");
+}
+
+export async function generateRegexFromDescription(description: string): Promise<RegexGeneration> {
+  const { finalResult } = await generateRegexFromDescriptionWithRetry(description, 1);
+  return finalResult;
 }
 
 export async function analyzeRegexPattern(pattern: string): Promise<RegexAnalysis> {

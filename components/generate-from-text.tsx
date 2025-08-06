@@ -9,13 +9,23 @@ import { Copy, Zap, CheckCircle, XCircle, Plus, RotateCcw, X, Sparkles, PlayCirc
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { RegexHighlighter } from "@/components/regex-highlighter";
-import { generateRegexAction } from "@/app/actions";
+import { generateRegexWithRetryAction } from "@/app/actions";
 
 interface TestCase {
   id: string;
   text: string;
   isValid: boolean;
   actualResult?: boolean;
+}
+
+interface GenerationStep {
+  step: number;
+  regex: string;
+  explanation: string;
+  testCases: TestCase[];
+  confidence: number;
+  failedTests: number;
+  status: "success" | "failed" | "retrying";
 }
 
 interface GenerateFromTextProps {
@@ -25,36 +35,44 @@ interface GenerateFromTextProps {
     explanation: string;
     testCases: TestCase[];
     isGenerating: boolean;
+    generationSteps: GenerationStep[];
   };
   updateState: (updates: Partial<GenerateFromTextProps["state"]>) => void;
 }
 
 export function GenerateFromText({ state, updateState }: GenerateFromTextProps) {
-  const { description, generatedRegex, explanation, testCases, isGenerating } = state;
+  const { description, generatedRegex, explanation, testCases, isGenerating, generationSteps } = state;
 
   const setDescription = (value: string) => updateState({ description: value });
   const setGeneratedRegex = (value: string) => updateState({ generatedRegex: value });
   const setExplanation = (value: string) => updateState({ explanation: value });
   const setTestCases = (value: TestCase[]) => updateState({ testCases: value });
   const setIsGenerating = (value: boolean) => updateState({ isGenerating: value });
+  const setGenerationSteps = (value: GenerationStep[]) => updateState({ generationSteps: value });
 
   const generateRegex = async () => {
     if (!description.trim()) return;
 
     setIsGenerating(true);
+    setGeneratedRegex("");
+    setExplanation("");
+    setTestCases([]);
+    setGenerationSteps([]);
 
     try {
-      const result = await generateRegexAction(description);
+      const result = await generateRegexWithRetryAction(description);
 
-      setGeneratedRegex(result.regex);
-      setExplanation(result.explanation);
+      setGeneratedRegex(result.finalResult.regex);
+      setExplanation(result.finalResult.explanation);
       setTestCases(
-        result.testCases.map((test, index) => ({
+        result.finalResult.testCases.map((test, index) => ({
           id: (index + 1).toString(),
           text: test.text,
           isValid: test.isValid,
+          actualResult: test.actualResult,
         }))
       );
+      setGenerationSteps(result.steps);
     } catch (error) {
       toast.error("Failed to generate regex. Please try again.");
       console.error("Generation error:", error);
@@ -208,6 +226,66 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
               </CardContent>
             </Card>
 
+            {generationSteps.length > 1 && (
+              <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <RotateCcw className="w-5 h-5 text-blue-500" />
+                    Generation History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {generationSteps.map((step, index) => (
+                      <div key={step.step} className="p-4 bg-zinc-800/50 backdrop-blur-sm rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant="outline"
+                              className={
+                                step.status === "success"
+                                  ? "border-green-500 text-green-400"
+                                  : step.status === "failed"
+                                  ? "border-red-500 text-red-400"
+                                  : "border-yellow-500 text-yellow-400"
+                              }
+                            >
+                              Step {step.step}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={
+                                step.failedTests === 0
+                                  ? "border-green-500 text-green-400"
+                                  : "border-red-500 text-red-400"
+                              }
+                            >
+                              {step.failedTests === 0 ? "All Tests Pass" : `${step.failedTests} Failed`}
+                            </Badge>
+                            {step.status === "retrying" && (
+                              <div className="flex items-center gap-2 text-yellow-400">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
+                                <span className="text-sm">Retrying...</span>
+                              </div>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-zinc-400">
+                            {step.confidence}% Confidence
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="bg-zinc-700/50 backdrop-blur-sm p-2 rounded">
+                            <RegexHighlighter pattern={step.regex} className="text-sm" />
+                          </div>
+                          <p className="text-zinc-300 text-sm">{step.explanation}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {testCases.length > 0 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -236,7 +314,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                                 testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
                               }
                             >
-                              {testCase.isValid ? "✓ Expected Valid" : "✗ Expected Invalid"}
+                              {testCase.isValid ? "✓ Positive Case" : "✗ Negative Case"}
                             </Badge>
                             {testCase.actualResult !== undefined && (
                               <Badge
@@ -247,7 +325,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                                     : "border-red-500 text-red-400"
                                 }
                               >
-                                {testCase.actualResult ? "✓ Actually Valid" : "✗ Actually Invalid"}
+                                {testCase.actualResult === testCase.isValid ? "✓ Correct" : "✗ Incorrect"}
                                 {testCase.actualResult !== testCase.isValid && " ❌"}
                               </Badge>
                             )}

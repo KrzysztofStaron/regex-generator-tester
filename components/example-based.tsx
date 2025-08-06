@@ -230,7 +230,7 @@ export function ExampleBased({ state, updateState }: ExampleBasedProps) {
                         variant="outline"
                         className={testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
                       >
-                        {testCase.isValid ? "✓ Expected Valid" : "✗ Expected Invalid"}
+                        {testCase.isValid ? "✓ Positive Case" : "✗ Negative Case"}
                       </Badge>
                       {testCase.actualResult !== undefined && (
                         <Badge
@@ -241,7 +241,7 @@ export function ExampleBased({ state, updateState }: ExampleBasedProps) {
                               : "border-red-500 text-red-400"
                           }
                         >
-                          {testCase.actualResult ? "✓ Actually Valid" : "✗ Actually Invalid"}
+                          {testCase.actualResult === testCase.isValid ? "✓ Correct" : "✗ Incorrect"}
                           {testCase.actualResult !== testCase.isValid && " ❌"}
                         </Badge>
                       )}
