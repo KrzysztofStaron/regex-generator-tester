@@ -519,13 +519,8 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex flex-col gap-1">
-                            <Badge
-                              variant="outline"
-                              className={
-                                result.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
-                              }
-                            >
-                              {result.isValid ? "✓ Should Match" : "✗ Should NOT Match"}
+                            <Badge variant="outline" className={"border-zinc-500 text-zinc-400"}>
+                              {result.isValid ? "Should Match" : "Should NOT Match"}
                             </Badge>
                             <Badge
                               variant="outline"
@@ -533,7 +528,8 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                                 result.passed ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
                               }
                             >
-                              {result.actualResult ? "✓ Does match" : "✗ Does not match"}
+                              {result.passed ? "✓" : "✗"}
+                              {result.actualResult ? " Does match" : " Does not match"}
                             </Badge>
                           </div>
                           {result.passed ? (
