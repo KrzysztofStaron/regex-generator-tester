@@ -1,102 +1,212 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Sidebar } from "@/components/sidebar";
+import { GenerateFromText } from "@/components/generate-from-text";
+import { AnalyzeRegex } from "@/components/analyze-regex";
+import { ExampleBased } from "@/components/example-based";
+import { InteractiveSandbox } from "@/components/interactive-sandbox";
+import { PatternLibrary } from "@/components/pattern-library";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [activeTab, setActiveTab] = useState("generate");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Generate tab state
+  const [generateDescription, setGenerateDescription] = useState("");
+  const [generateRegex, setGenerateRegex] = useState("");
+  const [generateExplanation, setGenerateExplanation] = useState("");
+  const [generateTestCases, setGenerateTestCases] = useState<any[]>([]);
+  const [generateIsGenerating, setGenerateIsGenerating] = useState(false);
+
+  // Analyze tab state
+  const [analyzeRegex, setAnalyzeRegex] = useState("");
+  const [analyzeAnalysis, setAnalyzeAnalysis] = useState<any>(null);
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [analyzeIsAnalyzing, setAnalyzeIsAnalyzing] = useState(false);
+  const [analyzeSuggestedFix, setAnalyzeSuggestedFix] = useState("");
+  const [analyzeIsFixing, setAnalyzeIsFixing] = useState(false);
+
+  // Examples tab state
+  const [examplesList, setExamplesList] = useState([{ id: "1", input: "", output: "" }]);
+  const [examplesRegex, setExamplesRegex] = useState("");
+  const [examplesConfidence, setExamplesConfidence] = useState(0);
+  const [examplesExplanation, setExamplesExplanation] = useState("");
+  const [examplesIsGenerating, setExamplesIsGenerating] = useState(false);
+
+  // Sandbox tab state
+  const [sandboxRegex, setSandboxRegex] = useState("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+  const [sandboxTestText, setSandboxTestText] = useState(`Here are some emails:
+john.doe@example.com
+invalid.email
+test@domain.co.uk
+another@test
+user123+tag@site.org
+@invalid.com`);
+  const [sandboxMatches, setSandboxMatches] = useState<any[]>([]);
+  const [sandboxError, setSandboxError] = useState("");
+  const [sandboxShowQuickActions, setSandboxShowQuickActions] = useState(false);
+  const [sandboxSavedPatterns, setSandboxSavedPatterns] = useState<any[]>([]);
+
+  // Library tab state
+  const [librarySearchTerm, setLibrarySearchTerm] = useState("");
+  const [librarySelectedCategory, setLibrarySelectedCategory] = useState("All");
+  const [libraryRecentPatterns, setLibraryRecentPatterns] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleNavigateToSandbox = () => {
+      setActiveTab("sandbox");
+    };
+
+    window.addEventListener("navigateToSandbox", handleNavigateToSandbox);
+    return () => window.removeEventListener("navigateToSandbox", handleNavigateToSandbox);
+  }, []);
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "generate":
+        return (
+          <GenerateFromText
+            state={{
+              description: generateDescription,
+              generatedRegex: generateRegex,
+              explanation: generateExplanation,
+              testCases: generateTestCases,
+              isGenerating: generateIsGenerating,
+            }}
+            updateState={updates => {
+              if (updates.description !== undefined) setGenerateDescription(updates.description);
+              if (updates.generatedRegex !== undefined) setGenerateRegex(updates.generatedRegex);
+              if (updates.explanation !== undefined) setGenerateExplanation(updates.explanation);
+              if (updates.testCases !== undefined) setGenerateTestCases(updates.testCases);
+              if (updates.isGenerating !== undefined) setGenerateIsGenerating(updates.isGenerating);
+            }}
+          />
+        );
+      case "analyze":
+        return (
+          <AnalyzeRegex
+            state={{
+              regex: analyzeRegex,
+              analysis: analyzeAnalysis,
+              error: analyzeError,
+              isAnalyzing: analyzeIsAnalyzing,
+              suggestedFix: analyzeSuggestedFix,
+              isFixing: analyzeIsFixing,
+            }}
+            updateState={updates => {
+              if (updates.regex !== undefined) setAnalyzeRegex(updates.regex);
+              if (updates.analysis !== undefined) setAnalyzeAnalysis(updates.analysis);
+              if (updates.error !== undefined) setAnalyzeError(updates.error);
+              if (updates.isAnalyzing !== undefined) setAnalyzeIsAnalyzing(updates.isAnalyzing);
+              if (updates.suggestedFix !== undefined) setAnalyzeSuggestedFix(updates.suggestedFix);
+              if (updates.isFixing !== undefined) setAnalyzeIsFixing(updates.isFixing);
+            }}
+          />
+        );
+      case "examples":
+        return (
+          <ExampleBased
+            state={{
+              examples: examplesList,
+              generatedRegex: examplesRegex,
+              confidence: examplesConfidence,
+              explanation: examplesExplanation,
+              isGenerating: examplesIsGenerating,
+            }}
+            updateState={updates => {
+              if (updates.examples !== undefined) setExamplesList(updates.examples);
+              if (updates.generatedRegex !== undefined) setExamplesRegex(updates.generatedRegex);
+              if (updates.confidence !== undefined) setExamplesConfidence(updates.confidence);
+              if (updates.explanation !== undefined) setExamplesExplanation(updates.explanation);
+              if (updates.isGenerating !== undefined) setExamplesIsGenerating(updates.isGenerating);
+            }}
+          />
+        );
+      case "sandbox":
+        return (
+          <InteractiveSandbox
+            state={{
+              regex: sandboxRegex,
+              testText: sandboxTestText,
+              matches: sandboxMatches,
+              error: sandboxError,
+              showQuickActions: sandboxShowQuickActions,
+              savedPatterns: sandboxSavedPatterns,
+            }}
+            updateState={updates => {
+              if (updates.regex !== undefined) setSandboxRegex(updates.regex);
+              if (updates.testText !== undefined) setSandboxTestText(updates.testText);
+              if (updates.matches !== undefined) setSandboxMatches(updates.matches);
+              if (updates.error !== undefined) setSandboxError(updates.error);
+              if (updates.showQuickActions !== undefined) setSandboxShowQuickActions(updates.showQuickActions);
+              if (updates.savedPatterns !== undefined) setSandboxSavedPatterns(updates.savedPatterns);
+            }}
+          />
+        );
+      case "library":
+        return (
+          <PatternLibrary
+            state={{
+              searchTerm: librarySearchTerm,
+              selectedCategory: librarySelectedCategory,
+              recentPatterns: libraryRecentPatterns,
+            }}
+            updateState={updates => {
+              if (updates.searchTerm !== undefined) setLibrarySearchTerm(updates.searchTerm);
+              if (updates.selectedCategory !== undefined) setLibrarySelectedCategory(updates.selectedCategory);
+              if (updates.recentPatterns !== undefined) setLibraryRecentPatterns(updates.recentPatterns);
+            }}
+          />
+        );
+      default:
+        return (
+          <GenerateFromText
+            state={{
+              description: generateDescription,
+              generatedRegex: generateRegex,
+              explanation: generateExplanation,
+              testCases: generateTestCases,
+              isGenerating: generateIsGenerating,
+            }}
+            updateState={updates => {
+              if (updates.description !== undefined) setGenerateDescription(updates.description);
+              if (updates.generatedRegex !== undefined) setGenerateRegex(updates.generatedRegex);
+              if (updates.explanation !== undefined) setGenerateExplanation(updates.explanation);
+              if (updates.testCases !== undefined) setGenerateTestCases(updates.testCases);
+              if (updates.isGenerating !== undefined) setGenerateIsGenerating(updates.isGenerating);
+            }}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white flex flex-col">
+      <div className="flex flex-col md:flex-row flex-1">
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="flex-1 overflow-auto">{renderContent()}</main>
+      </div>
+      <footer className="border-t border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 mt-auto">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
+          <div className="flex gap-4">
+            <button onClick={() => setActiveTab("generate")} className="hover:text-white transition-colors">
+              Generate
+            </button>
+            <button onClick={() => setActiveTab("analyze")} className="hover:text-white transition-colors">
+              Analyze
+            </button>
+            <button onClick={() => setActiveTab("sandbox")} className="hover:text-white transition-colors">
+              Sandbox
+            </button>
+            <button onClick={() => setActiveTab("library")} className="hover:text-white transition-colors">
+              Library
+            </button>
+          </div>
+          <div className="flex items-center gap-4 text-xs">
+            <span>Ctrl+Enter: Generate | Enter: Analyze</span>
+            <span>Made with ❤️ using AI-powered regex generation</span>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
       </footer>
     </div>
   );
