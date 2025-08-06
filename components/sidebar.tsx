@@ -17,18 +17,6 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           icon: Zap,
           description: "From natural language",
         },
-        {
-          id: "analyze",
-          label: "Analyze Regex",
-          icon: Search,
-          description: "Reverse mode",
-        },
-        {
-          id: "examples",
-          label: "From Examples",
-          icon: FileText,
-          description: "Input-output pairs",
-        },
       ],
     },
     {
@@ -39,6 +27,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           label: "Interactive Sandbox",
           icon: Play,
           description: "Test and refine",
+        },
+        {
+          id: "analyze",
+          label: "Analyze Regex",
+          icon: Search,
+          description: "Reverse mode",
         },
         {
           id: "library",

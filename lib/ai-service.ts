@@ -188,9 +188,11 @@ export async function generateRegexFromTestCases(
           ${contextMessage}
           
           Return a JSON object with:
-          - regex: the regex pattern (escaped for JavaScript)
-          - explanation: plain English explanation of the regex
-          - confidence: number 0-100
+          {
+            "regex": the regex pattern (escaped for JavaScript),
+            "explanation": plain English explanation of the regex,
+            "confidence": number 0-100
+          }
           
           Make sure the regex is practical and handles the test cases correctly.`,
         },

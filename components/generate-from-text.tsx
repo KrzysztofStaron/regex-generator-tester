@@ -290,6 +290,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                 }}
                 className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 min-h-[100px] resize-none"
               />
+
               <div className="flex gap-2 items-center">
                 <Button
                   variant="default"
@@ -298,6 +299,17 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   {isGeneratingTestCases ? "Generating Test Cases..." : "Generate Test Cases"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCurrentStep("test-cases");
+                    setTestCasesExplanation("Manual test cases - Add your own examples below");
+                  }}
+                  disabled={!description.trim() || generatedTestCases.length === 0}
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Edit Test Cases
                 </Button>
                 {description && (
                   <Button
