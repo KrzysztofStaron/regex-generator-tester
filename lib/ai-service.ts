@@ -92,6 +92,17 @@ export interface StepByStepResult {
   }>;
   confidence: number;
   allTestsPassed: boolean;
+  breakdown?: {
+    purpose: string;
+    complexity: "Beginner" | "Intermediate" | "Advanced";
+    parts: Array<{
+      text: string;
+      type: string;
+      description: string;
+      example: string;
+      color: string;
+    }>;
+  };
 }
 
 // Step 1: Generate test cases from description
@@ -221,12 +232,32 @@ Return a JSON object with:
 - "regex": The complete regex pattern (properly escaped for JavaScript)
 - "explanation": Clear explanation of how the regex works, breaking down each part
 - "confidence": Your confidence level (0-100) based on how well you think it will work
+- "breakdown": Detailed part-by-part breakdown for educational purposes (optional but encouraged)
+
+The "breakdown" should be an object with:
+- "purpose": What this pattern is designed to match
+- "complexity": "Beginner", "Intermediate", or "Advanced"
+- "parts": Array of pattern components, each with:
+  - "text": The exact regex text for this part
+  - "type": Component type (escape, charClass, group, quantifier, anchor, wildcard, alternation, literal)
+  - "description": What this part does
+  - "example": Example of what it matches
+  - "color": Tailwind color class for syntax highlighting
 
 EXAMPLE OUTPUT:
 {
   "regex": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b",
   "explanation": "This regex matches email addresses by requiring: word boundary, local part with alphanumeric and common email characters, @ symbol, domain with alphanumeric and dots, TLD of 2+ letters, word boundary",
-  "confidence": 95
+  "confidence": 95,
+  "breakdown": {
+    "purpose": "Validates email addresses with proper format",
+    "complexity": "Intermediate",
+    "parts": [
+      {"text": "\\b", "type": "anchor", "description": "Word boundary at start", "example": "Ensures clean start", "color": "text-red-400"},
+      {"text": "[a-zA-Z0-9._%+-]+", "type": "charClass", "description": "Local part of email", "example": "user123, test.email", "color": "text-blue-400"},
+      {"text": "@", "type": "literal", "description": "At symbol separator", "example": "@", "color": "text-gray-400"}
+    ]
+  }
 }`,
         },
       ],
@@ -284,6 +315,7 @@ EXAMPLE OUTPUT:
       testResults,
       confidence: result.confidence,
       allTestsPassed,
+      breakdown: result.breakdown,
     };
   } catch (error) {
     console.error("AI regex generation error:", error);

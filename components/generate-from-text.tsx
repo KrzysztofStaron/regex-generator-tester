@@ -17,6 +17,11 @@ import {
   PlayCircle,
   ArrowRight,
   Edit3,
+  Eye,
+  EyeOff,
+  Info,
+  Layers,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -54,6 +59,17 @@ interface GenerateFromTextProps {
     confidence?: number;
     allTestsPassed?: boolean;
     previousAttempt?: { regex: string; failures: string[] } | undefined;
+    breakdown?: {
+      purpose: string;
+      complexity: "Beginner" | "Intermediate" | "Advanced";
+      parts: Array<{
+        text: string;
+        type: string;
+        description: string;
+        example: string;
+        color: string;
+      }>;
+    };
   };
   updateState: (updates: Partial<GenerateFromTextProps["state"]>) => void;
 }
@@ -72,7 +88,10 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
     confidence = 0,
     allTestsPassed = false,
     previousAttempt = undefined,
+    breakdown,
   } = state;
+
+  const [showRegexBreakdown, setShowRegexBreakdown] = useState(false);
 
   const setDescription = (value: string) => updateState({ description: value });
   const setCurrentStep = (value: WorkflowStep) => updateState({ currentStep: value });
@@ -133,6 +152,11 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
       setConfidence(result.confidence);
       setAllTestsPassed(result.allTestsPassed);
 
+      // Set breakdown if available from AI response
+      if (result.breakdown) {
+        updateState({ breakdown: result.breakdown });
+      }
+
       // Convert test results to our format
       const resultsWithIds = result.testResults.map((tr, index) => ({
         id: (index + 1).toString(),
@@ -190,6 +214,11 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
         setRegexExplanation(result.explanation);
         setConfidence(result.confidence);
         setAllTestsPassed(result.allTestsPassed);
+
+        // Set breakdown if available from AI response
+        if (result.breakdown) {
+          updateState({ breakdown: result.breakdown });
+        }
 
         // Convert test results to our format
         const resultsWithIds = result.testResults.map((tr, index) => ({
@@ -259,6 +288,321 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(finalRegex);
     toast.success("Regex copied to clipboard!");
+  };
+
+  // Toggle breakdown display
+  const toggleBreakdown = () => {
+    setShowRegexBreakdown(!showRegexBreakdown);
+  };
+
+  // Legacy manual parsing function (fallback)
+  const parseRegexPattern = (pattern: string) => {
+    const parts = [];
+    let i = 0;
+
+    while (i < pattern.length) {
+      const char = pattern[i];
+
+      if (char === "\\" && i + 1 < pattern.length) {
+        const nextChar = pattern[i + 1];
+        let description = "";
+        let example = "";
+
+        switch (nextChar) {
+          case "d":
+            description = "Any digit";
+            example = "0-9";
+            break;
+          case "w":
+            description = "Any word character";
+            example = "a-z, A-Z, 0-9, _";
+            break;
+          case "s":
+            description = "Any whitespace";
+            example = "space, tab, newline";
+            break;
+          case "D":
+            description = "Any non-digit";
+            example = "letters, symbols";
+            break;
+          case "W":
+            description = "Any non-word character";
+            example = "symbols, spaces";
+            break;
+          case "S":
+            description = "Any non-whitespace";
+            example = "letters, digits, symbols";
+            break;
+          case "n":
+            description = "Newline character";
+            example = "line break";
+            break;
+          case "t":
+            description = "Tab character";
+            example = "tab space";
+            break;
+          case ".":
+            description = "Literal dot";
+            example = ".";
+            break;
+          case "+":
+            description = "Literal plus";
+            example = "+";
+            break;
+          case "*":
+            description = "Literal asterisk";
+            example = "*";
+            break;
+          case "?":
+            description = "Literal question mark";
+            example = "?";
+            break;
+          case "[":
+            description = "Literal opening bracket";
+            example = "[";
+            break;
+          case "]":
+            description = "Literal closing bracket";
+            example = "]";
+            break;
+          case "(":
+            description = "Literal opening parenthesis";
+            example = "(";
+            break;
+          case ")":
+            description = "Literal closing parenthesis";
+            example = ")";
+            break;
+          case "{":
+            description = "Literal opening brace";
+            example = "{";
+            break;
+          case "}":
+            description = "Literal closing brace";
+            example = "}";
+            break;
+          case "^":
+            description = "Literal caret";
+            example = "^";
+            break;
+          case "$":
+            description = "Literal dollar sign";
+            example = "$";
+            break;
+          case "|":
+            description = "Literal pipe";
+            example = "|";
+            break;
+          case "/":
+            description = "Literal forward slash";
+            example = "/";
+            break;
+          case "\\":
+            description = "Literal backslash";
+            example = "\\";
+            break;
+          default:
+            description = `Escaped character`;
+            example = nextChar;
+        }
+
+        parts.push({
+          text: `\\${nextChar}`,
+          type: "escape",
+          description,
+          example,
+          color: "text-purple-400",
+        });
+        i += 2;
+      } else if (char === "[") {
+        // Character class
+        let j = i + 1;
+        while (j < pattern.length && pattern[j] !== "]") {
+          j++;
+        }
+        if (j < pattern.length) {
+          const content = pattern.slice(i + 1, j);
+          let description = "Character class";
+          let example = "";
+
+          if (content.startsWith("^")) {
+            description = "Negated character class";
+            example = `Any character except: ${content.slice(1)}`;
+          } else if (content.includes("-")) {
+            description = "Character range";
+            example = `Characters in range: ${content}`;
+          } else {
+            description = "Any of these characters";
+            example = content;
+          }
+
+          parts.push({
+            text: pattern.slice(i, j + 1),
+            type: "charClass",
+            description,
+            example,
+            color: "text-blue-400",
+          });
+          i = j + 1;
+        } else {
+          parts.push({
+            text: char,
+            type: "literal",
+            description: "Literal character",
+            example: char,
+            color: "text-gray-400",
+          });
+          i++;
+        }
+      } else if (char === "(") {
+        // Group
+        let j = i + 1;
+        let depth = 1;
+        while (j < pattern.length && depth > 0) {
+          if (pattern[j] === "(") depth++;
+          if (pattern[j] === ")") depth--;
+          j++;
+        }
+        if (depth === 0) {
+          const content = pattern.slice(i + 1, j - 1);
+          parts.push({
+            text: pattern.slice(i, j),
+            type: "group",
+            description: "Capturing group",
+            example: `Captures: ${content}`,
+            color: "text-yellow-400",
+          });
+          i = j;
+        } else {
+          parts.push({
+            text: char,
+            type: "literal",
+            description: "Literal character",
+            example: char,
+            color: "text-gray-400",
+          });
+          i++;
+        }
+      } else if (char === "+") {
+        parts.push({
+          text: char,
+          type: "quantifier",
+          description: "One or more",
+          example: "Matches 1+ times",
+          color: "text-green-400",
+        });
+        i++;
+      } else if (char === "*") {
+        parts.push({
+          text: char,
+          type: "quantifier",
+          description: "Zero or more",
+          example: "Matches 0+ times",
+          color: "text-green-400",
+        });
+        i++;
+      } else if (char === "?") {
+        parts.push({
+          text: char,
+          type: "quantifier",
+          description: "Zero or one",
+          example: "Optional match",
+          color: "text-green-400",
+        });
+        i++;
+      } else if (char === "^") {
+        parts.push({
+          text: char,
+          type: "anchor",
+          description: "Start of string",
+          example: "Beginning anchor",
+          color: "text-red-400",
+        });
+        i++;
+      } else if (char === "$") {
+        parts.push({
+          text: char,
+          type: "anchor",
+          description: "End of string",
+          example: "Ending anchor",
+          color: "text-red-400",
+        });
+        i++;
+      } else if (char === ".") {
+        parts.push({
+          text: char,
+          type: "wildcard",
+          description: "Any character",
+          example: "Matches any single character",
+          color: "text-orange-400",
+        });
+        i++;
+      } else if (char === "|") {
+        parts.push({
+          text: char,
+          type: "alternation",
+          description: "OR operator",
+          example: "Matches either option",
+          color: "text-pink-400",
+        });
+        i++;
+      } else if (char === "{") {
+        // Quantifier
+        let j = i + 1;
+        while (j < pattern.length && pattern[j] !== "}") {
+          j++;
+        }
+        if (j < pattern.length) {
+          const content = pattern.slice(i + 1, j);
+          let description = "Exact repetition";
+          let example = "";
+
+          if (content.includes(",")) {
+            const [min, max] = content.split(",");
+            if (max === "") {
+              description = "Minimum repetition";
+              example = `At least ${min} times`;
+            } else {
+              description = "Range repetition";
+              example = `Between ${min} and ${max} times`;
+            }
+          } else {
+            description = "Exact repetition";
+            example = `Exactly ${content} times`;
+          }
+
+          parts.push({
+            text: pattern.slice(i, j + 1),
+            type: "quantifier",
+            description,
+            example,
+            color: "text-green-400",
+          });
+          i = j + 1;
+        } else {
+          parts.push({
+            text: char,
+            type: "literal",
+            description: "Literal character",
+            example: char,
+            color: "text-gray-400",
+          });
+          i++;
+        }
+      } else {
+        // Literal character
+        parts.push({
+          text: char,
+          type: "literal",
+          description: "Literal character",
+          example: `Matches "${char}"`,
+          color: "text-gray-400",
+        });
+        i++;
+      }
+    }
+
+    return parts;
   };
 
   return (
@@ -579,6 +923,138 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                   </Button>
                 </div>
                 <p className="text-zinc-300 text-sm">{regexExplanation}</p>
+
+                {/* AI-Powered Regex Breakdown */}
+                <div className="border-t border-zinc-700/50 pt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleBreakdown}
+                    className="text-zinc-400 hover:text-white"
+                    disabled={!breakdown}
+                  >
+                    <Layers className="w-4 h-4 mr-2" />
+                    {showRegexBreakdown ? "Hide" : "Show"} Pattern Breakdown
+                    {showRegexBreakdown ? <EyeOff className="w-4 h-4 ml-2" /> : <Eye className="w-4 h-4 ml-2" />}
+                  </Button>
+
+                  {showRegexBreakdown && finalRegex && breakdown && (
+                    <div className="mt-4 p-4 bg-zinc-800/30 backdrop-blur-sm rounded-lg border border-zinc-700/30">
+                      {/* Header with purpose and complexity */}
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            <h4 className="text-white font-medium">AI Pattern Analysis</h4>
+                          </div>
+                          <p className="text-zinc-300 text-sm leading-relaxed">{breakdown.purpose}</p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`ml-4 ${
+                            breakdown.complexity === "Beginner"
+                              ? "text-green-400 border-green-500/30"
+                              : breakdown.complexity === "Intermediate"
+                              ? "text-yellow-400 border-yellow-500/30"
+                              : "text-red-400 border-red-500/30"
+                          }`}
+                        >
+                          {breakdown.complexity}
+                        </Badge>
+                      </div>
+
+                      {/* Overall explanation */}
+                      <div className="mb-6 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-blue-200 text-sm">{regexExplanation}</p>
+                      </div>
+
+                      {/* Pattern breakdown */}
+                      <div className="space-y-3">
+                        <h5 className="text-white font-medium text-sm flex items-center gap-2">
+                          <Info className="w-4 h-4 text-blue-400" />
+                          Pattern Components
+                        </h5>
+                        {breakdown.parts.map((part, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-4 p-4 bg-zinc-900/50 backdrop-blur-sm rounded-lg border border-zinc-700/50 hover:border-zinc-600/50 transition-all duration-200"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="bg-zinc-800/50 px-3 py-2 rounded-lg font-mono text-sm border border-zinc-700/50 min-w-fit">
+                                <span className={part.color}>{part.text}</span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white text-sm font-medium mb-1">{part.description}</div>
+                                <div className="text-zinc-400 text-xs">{part.example}</div>
+                              </div>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs border-zinc-600/50 ${
+                                part.type === "escape"
+                                  ? "text-purple-400 border-purple-500/30"
+                                  : part.type === "charClass"
+                                  ? "text-blue-400 border-blue-500/30"
+                                  : part.type === "group"
+                                  ? "text-yellow-400 border-yellow-500/30"
+                                  : part.type === "quantifier"
+                                  ? "text-green-400 border-green-500/30"
+                                  : part.type === "anchor"
+                                  ? "text-red-400 border-red-500/30"
+                                  : part.type === "wildcard"
+                                  ? "text-orange-400 border-orange-500/30"
+                                  : part.type === "alternation"
+                                  ? "text-pink-400 border-pink-500/30"
+                                  : "text-zinc-400 border-zinc-500/30"
+                              }`}
+                            >
+                              {part.type}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pattern Legend */}
+                      <div className="mt-6 pt-4 border-t border-zinc-700/30">
+                        <h5 className="text-zinc-400 text-xs font-medium mb-3">Component Types:</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+                            <span className="text-zinc-400">Escape Sequences</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                            <span className="text-zinc-400">Character Classes</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                            <span className="text-zinc-400">Groups</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                            <span className="text-zinc-400">Quantifiers</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                            <span className="text-zinc-400">Anchors</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                            <span className="text-zinc-400">Wildcards</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-pink-400"></div>
+                            <span className="text-zinc-400">Alternation</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-zinc-400"></div>
+                            <span className="text-zinc-400">Literals</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {allTestsPassed ? (
                   <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">

@@ -33,6 +33,7 @@ export default function Home() {
   const [generateConfidence, setGenerateConfidence] = useState(0);
   const [generateAllTestsPassed, setGenerateAllTestsPassed] = useState(false);
   const [generatePreviousAttempt, setGeneratePreviousAttempt] = useState<any>(undefined);
+  const [generateBreakdown, setGenerateBreakdown] = useState<any>(undefined);
 
   // Analyze tab state
   const [analyzeRegex, setAnalyzeRegex] = useState("");
@@ -121,6 +122,7 @@ user123+tag@site.org
               confidence: generateConfidence,
               allTestsPassed: generateAllTestsPassed,
               previousAttempt: generatePreviousAttempt,
+              breakdown: generateBreakdown,
             }}
             updateState={updates => {
               if (updates.description !== undefined) setGenerateDescription(updates.description);
@@ -143,6 +145,7 @@ user123+tag@site.org
               if (updates.confidence !== undefined) setGenerateConfidence(updates.confidence);
               if (updates.allTestsPassed !== undefined) setGenerateAllTestsPassed(updates.allTestsPassed);
               if (updates.previousAttempt !== undefined) setGeneratePreviousAttempt(updates.previousAttempt);
+              if (updates.breakdown !== undefined) setGenerateBreakdown(updates.breakdown);
             }}
           />
         );
