@@ -19,7 +19,11 @@ export interface RegexAnalysis {
 export interface RegexGeneration {
   regex: string;
   explanation: string;
-  testCases: Array<{ text: string; isValid: boolean }>;
+  testCases: Array<{
+    text: string;
+    isValid: boolean;
+    actualResult?: boolean;
+  }>;
   confidence: number;
 }
 
@@ -52,6 +56,26 @@ export async function generateRegexFromDescription(description: string): Promise
     if (!content) throw new Error("No response from AI");
 
     const result = JSON.parse(content);
+
+    // Validate test cases against the generated regex
+    if (result.testCases && Array.isArray(result.testCases)) {
+      try {
+        const regex = new RegExp(result.regex);
+        result.testCases = result.testCases.map(testCase => ({
+          ...testCase,
+          actualResult: regex.test(testCase.text),
+          isValid: testCase.isValid === regex.test(testCase.text),
+        }));
+      } catch (regexError) {
+        console.warn("Invalid regex generated:", result.regex, regexError);
+        result.testCases = result.testCases.map(testCase => ({
+          ...testCase,
+          actualResult: false,
+          isValid: false,
+        }));
+      }
+    }
+
     return result;
   } catch (error) {
     console.error("AI generation error:", error);
@@ -134,6 +158,26 @@ export async function generateRegexFromExamples(
     if (!content) throw new Error("No response from AI");
 
     const result = JSON.parse(content);
+
+    // Validate test cases against the generated regex
+    if (result.testCases && Array.isArray(result.testCases)) {
+      try {
+        const regex = new RegExp(result.regex);
+        result.testCases = result.testCases.map(testCase => ({
+          ...testCase,
+          actualResult: regex.test(testCase.text),
+          isValid: testCase.isValid === regex.test(testCase.text),
+        }));
+      } catch (regexError) {
+        console.warn("Invalid regex generated:", result.regex, regexError);
+        result.testCases = result.testCases.map(testCase => ({
+          ...testCase,
+          actualResult: false,
+          isValid: false,
+        }));
+      }
+    }
+
     return result;
   } catch (error) {
     console.error("AI generation error:", error);

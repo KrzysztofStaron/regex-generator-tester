@@ -16,24 +16,33 @@ interface Example {
   output: string;
 }
 
+interface TestCase {
+  id: string;
+  text: string;
+  isValid: boolean;
+  actualResult?: boolean;
+}
+
 interface ExampleBasedProps {
   state: {
     examples: Example[];
     generatedRegex: string;
     confidence: number;
     explanation: string;
+    testCases: TestCase[];
     isGenerating: boolean;
   };
   updateState: (updates: Partial<ExampleBasedProps["state"]>) => void;
 }
 
 export function ExampleBased({ state, updateState }: ExampleBasedProps) {
-  const { examples, generatedRegex, confidence, explanation, isGenerating } = state;
+  const { examples, generatedRegex, confidence, explanation, testCases, isGenerating } = state;
 
   const setExamples = (value: Example[]) => updateState({ examples: value });
   const setGeneratedRegex = (value: string) => updateState({ generatedRegex: value });
   const setConfidence = (value: number) => updateState({ confidence: value });
   const setExplanation = (value: string) => updateState({ explanation: value });
+  const setTestCases = (value: TestCase[]) => updateState({ testCases: value });
   const setIsGenerating = (value: boolean) => updateState({ isGenerating: value });
 
   const addExample = () => {
@@ -66,6 +75,7 @@ export function ExampleBased({ state, updateState }: ExampleBasedProps) {
       setGeneratedRegex(result.regex);
       setExplanation(result.explanation);
       setConfidence(result.confidence);
+      setTestCases(result.testCases || []);
     } catch (error) {
       toast.error("Failed to generate regex from examples. Please try again.");
       console.error("Generation error:", error);
@@ -201,6 +211,44 @@ export function ExampleBased({ state, updateState }: ExampleBasedProps) {
                   <PlayCircle className="w-4 h-4 mr-2" />
                   Test in Sandbox
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {testCases.length > 0 && (
+          <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+            <CardHeader>
+              <CardTitle className="text-white">Generated Test Cases</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {testCases.map((testCase, index) => (
+                  <div key={index} className="p-4 bg-zinc-800/50 backdrop-blur-sm rounded-lg">
+                    <div className="flex flex-col gap-2 mb-3">
+                      <Badge
+                        variant="outline"
+                        className={testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
+                      >
+                        {testCase.isValid ? "✓ Expected Valid" : "✗ Expected Invalid"}
+                      </Badge>
+                      {testCase.actualResult !== undefined && (
+                        <Badge
+                          variant="outline"
+                          className={
+                            testCase.actualResult === testCase.isValid
+                              ? "border-green-500 text-green-400"
+                              : "border-red-500 text-red-400"
+                          }
+                        >
+                          {testCase.actualResult ? "✓ Actually Valid" : "✗ Actually Invalid"}
+                          {testCase.actualResult !== testCase.isValid && " ❌"}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-zinc-300 text-sm font-mono break-all">{testCase.text}</p>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

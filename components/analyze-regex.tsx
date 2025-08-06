@@ -227,10 +227,36 @@ export function AnalyzeRegex({ state, updateState }: AnalyzeRegexProps) {
             {analysis.suggestions && analysis.suggestions.length > 0 && (
               <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4 text-yellow-500" />
-                    AI Suggestions
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-500" />
+                      AI Suggestions
+                    </CardTitle>
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={() => {
+                        // Apply the first suggestion as an example
+                        // In a real implementation, you might want to show a dropdown or modal
+                        // to let users choose which suggestion to apply
+                        const firstSuggestion = analysis.suggestions[0];
+                        if (firstSuggestion) {
+                          // Extract regex pattern from suggestion if it contains one
+                          const regexMatch = firstSuggestion.match(/`([^`]+)`/);
+                          if (regexMatch) {
+                            setRegex(regexMatch[1]);
+                            toast.success("Applied AI suggestion!");
+                          } else {
+                            toast.info("Suggestion applied (no regex pattern found)");
+                          }
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      <Check className="w-3 h-3 mr-1" />
+                      Apply
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">

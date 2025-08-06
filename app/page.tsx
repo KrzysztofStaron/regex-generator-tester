@@ -31,6 +31,7 @@ export default function Home() {
   const [examplesRegex, setExamplesRegex] = useState("");
   const [examplesConfidence, setExamplesConfidence] = useState(0);
   const [examplesExplanation, setExamplesExplanation] = useState("");
+  const [examplesTestCases, setExamplesTestCases] = useState<any[]>([]);
   const [examplesIsGenerating, setExamplesIsGenerating] = useState(false);
 
   // Sandbox tab state
@@ -111,6 +112,7 @@ user123+tag@site.org
               generatedRegex: examplesRegex,
               confidence: examplesConfidence,
               explanation: examplesExplanation,
+              testCases: examplesTestCases,
               isGenerating: examplesIsGenerating,
             }}
             updateState={updates => {
@@ -118,6 +120,7 @@ user123+tag@site.org
               if (updates.generatedRegex !== undefined) setExamplesRegex(updates.generatedRegex);
               if (updates.confidence !== undefined) setExamplesConfidence(updates.confidence);
               if (updates.explanation !== undefined) setExamplesExplanation(updates.explanation);
+              if (updates.testCases !== undefined) setExamplesTestCases(updates.testCases);
               if (updates.isGenerating !== undefined) setExamplesIsGenerating(updates.isGenerating);
             }}
           />

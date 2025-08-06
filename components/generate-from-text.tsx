@@ -15,6 +15,7 @@ interface TestCase {
   id: string;
   text: string;
   isValid: boolean;
+  actualResult?: boolean;
 }
 
 interface GenerateFromTextProps {
@@ -228,14 +229,29 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                     <Card key={testCase.id} className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
-                          <Badge
-                            variant="outline"
-                            className={
-                              testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
-                            }
-                          >
-                            {testCase.isValid ? "✓ Valid" : "✗ Invalid"}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge
+                              variant="outline"
+                              className={
+                                testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                              }
+                            >
+                              {testCase.isValid ? "✓ Expected Valid" : "✗ Expected Invalid"}
+                            </Badge>
+                            {testCase.actualResult !== undefined && (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  testCase.actualResult === testCase.isValid
+                                    ? "border-green-500 text-green-400"
+                                    : "border-red-500 text-red-400"
+                                }
+                              >
+                                {testCase.actualResult ? "✓ Actually Valid" : "✗ Actually Invalid"}
+                                {testCase.actualResult !== testCase.isValid && " ❌"}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex gap-1">
                             <Button
                               variant="outline"
