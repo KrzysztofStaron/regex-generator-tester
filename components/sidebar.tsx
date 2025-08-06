@@ -50,7 +50,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   ];
 
   return (
-    <div className="w-full md:w-64 bg-zinc-900/80 backdrop-blur-sm border-b md:border-r md:border-b-0 border-zinc-800/50 flex flex-col md:h-screen">
+    <div className="w-full md:w-64 bg-zinc-900/80 backdrop-blur-sm border-b md:border-r md:border-b-0 border-zinc-800/50 flex flex-col md:h-screen md:fixed md:left-0 md:top-0 md:z-50">
       <div className="p-4 md:p-6 border-b border-zinc-800/50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -63,7 +63,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-6">
           {menuItems.map(group => (
             <div key={group.group} className="space-y-2">

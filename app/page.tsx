@@ -192,7 +192,7 @@ user123+tag@site.org
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white flex flex-col">
       <div className="flex flex-col md:flex-row flex-1">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 overflow-auto">{renderContent()}</main>
+        <main className="flex-1 overflow-auto md:ml-64">{renderContent()}</main>
       </div>
       <footer className="border-t border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 mt-auto">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
