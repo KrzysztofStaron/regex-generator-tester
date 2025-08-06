@@ -75,7 +75,12 @@ export function ExampleBased({ state, updateState }: ExampleBasedProps) {
       setGeneratedRegex(result.regex);
       setExplanation(result.explanation);
       setConfidence(result.confidence);
-      setTestCases(result.testCases || []);
+      setTestCases(
+        (result.testCases || []).map((testCase, index) => ({
+          ...testCase,
+          id: `test-${Date.now()}-${index}`,
+        }))
+      );
     } catch (error) {
       toast.error("Failed to generate regex from examples. Please try again.");
       console.error("Generation error:", error);
