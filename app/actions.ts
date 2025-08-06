@@ -6,8 +6,12 @@ import {
   analyzeRegexPattern,
   generateRegexFromExamples,
   suggestRegexFix,
+  generateTestCases,
+  generateRegexFromTestCases,
   type RegexGeneration,
   type RegexAnalysis,
+  type TestCasesGeneration,
+  type StepByStepResult,
 } from "@/lib/ai-service";
 
 export async function generateRegexAction(description: string): Promise<RegexGeneration> {
@@ -55,4 +59,29 @@ export async function suggestFixAction(pattern: string, error: string): Promise<
   }
 
   return await suggestRegexFix(pattern, error);
+}
+
+// Step-by-step generation actions
+export async function generateTestCasesAction(description: string): Promise<TestCasesGeneration> {
+  if (!description.trim()) {
+    throw new Error("Description is required");
+  }
+
+  return await generateTestCases(description);
+}
+
+export async function generateRegexFromTestCasesAction(
+  description: string,
+  testCases: Array<{ text: string; isValid: boolean }>,
+  previousAttempt?: { regex: string; failures: string[] }
+): Promise<StepByStepResult> {
+  if (!description.trim()) {
+    throw new Error("Description is required");
+  }
+
+  if (!testCases || testCases.length === 0) {
+    throw new Error("Test cases are required");
+  }
+
+  return await generateRegexFromTestCases(description, testCases, previousAttempt);
 }

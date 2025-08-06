@@ -9,6 +9,45 @@ const openai = new OpenAI({
   },
 });
 
+// Helper function to safely parse AI JSON responses
+function parseAIResponse(content: string): any {
+  if (!content) throw new Error("No response from AI");
+
+  // Clean the content to handle common JSON issues
+  let cleanedContent = content.trim();
+
+  // Remove any markdown code blocks if present
+  if (cleanedContent.startsWith("```json")) {
+    cleanedContent = cleanedContent.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+  } else if (cleanedContent.startsWith("```")) {
+    cleanedContent = cleanedContent.replace(/^```\s*/, "").replace(/\s*```$/, "");
+  }
+
+  // Try to parse the JSON
+  try {
+    return JSON.parse(cleanedContent);
+  } catch (parseError) {
+    console.error("JSON parse error:", parseError);
+    console.error("Raw content:", content);
+    console.error("Cleaned content:", cleanedContent);
+
+    // Try to fix common JSON issues
+    try {
+      // Replace problematic control characters
+      const fixedContent = cleanedContent
+        .replace(/[\x00-\x1F\x7F]/g, "") // Remove control characters
+        .replace(/\n/g, "\\n") // Escape newlines
+        .replace(/\r/g, "\\r") // Escape carriage returns
+        .replace(/\t/g, "\\t"); // Escape tabs
+
+      return JSON.parse(fixedContent);
+    } catch (secondError) {
+      console.error("Second JSON parse attempt failed:", secondError);
+      throw new Error("AI returned invalid JSON format");
+    }
+  }
+}
+
 export interface RegexAnalysis {
   explanation: string;
   components: Array<{ part: string; description: string; color: string }>;
@@ -41,132 +80,196 @@ export interface GenerationStep {
   status: "success" | "failed" | "retrying";
 }
 
+// Step-by-step generation interfaces
+export interface TestCasesGeneration {
+  testCases: Array<{
+    text: string;
+    isValid: boolean;
+  }>;
+  explanation: string;
+}
+
+export interface StepByStepResult {
+  regex: string;
+  explanation: string;
+  testResults: Array<{
+    text: string;
+    isValid: boolean;
+    actualResult: boolean;
+    passed: boolean;
+  }>;
+  confidence: number;
+  allTestsPassed: boolean;
+}
+
+// Step 1: Generate test cases from description
+export async function generateTestCases(description: string): Promise<TestCasesGeneration> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "anthropic/claude-sonnet-4",
+      messages: [
+        {
+          role: "system",
+          content: `You are a regex expert. Generate comprehensive test cases for a regex pattern based on a natural language description.
+
+          Return a JSON object with:
+          - testCases: array of {text, isValid} objects (4 valid, 4 invalid examples)
+          - explanation: brief explanation of what the test cases cover
+
+          For test cases, include:
+          - Basic valid examples that should match
+          - Edge cases that should match
+          - Common invalid variations that should NOT match
+          - Boundary cases that test limits
+          
+          Make test cases realistic and comprehensive.
+          IMPORTANT: Ensure all text values are properly escaped for JSON.`,
+        },
+        {
+          role: "user",
+          content: `Generate test cases for: ${description}`,
+        },
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("No response from AI");
+    const result = parseAIResponse(content);
+
+    // Validate the result structure
+    if (!result.testCases || !Array.isArray(result.testCases)) {
+      throw new Error("AI response missing testCases array");
+    }
+
+    if (!result.explanation || typeof result.explanation !== "string") {
+      throw new Error("AI response missing explanation");
+    }
+
+    return result;
+  } catch (error) {
+    console.error("AI test case generation error:", error);
+    throw new Error("Failed to generate test cases");
+  }
+}
+
+// Step 2: Generate regex from description and test cases
+export async function generateRegexFromTestCases(
+  description: string,
+  testCases: Array<{ text: string; isValid: boolean }>,
+  previousAttempt?: { regex: string; failures: string[] }
+): Promise<StepByStepResult> {
+  try {
+    const contextMessage = previousAttempt
+      ? `Previous regex "${previousAttempt.regex}" failed with these issues:\n${previousAttempt.failures.join(
+          "\n"
+        )}\n\nImprove the regex to fix these problems.`
+      : "";
+
+    const response = await openai.chat.completions.create({
+      model: "anthropic/claude-sonnet-4",
+      messages: [
+        {
+          role: "system",
+          content: `You are a regex expert. Generate a regex pattern that works correctly with the provided test cases.
+          
+          ${contextMessage}
+          
+          Return a JSON object with:
+          - regex: the regex pattern (escaped for JavaScript)
+          - explanation: plain English explanation of the regex
+          - confidence: number 0-100
+          
+          Make sure the regex is practical and handles the test cases correctly.`,
+        },
+        {
+          role: "user",
+          content: `Generate a regex for: ${description}
+          
+          Test cases that must work:
+          ${testCases.map(tc => `${tc.isValid ? "✓" : "✗"} "${tc.text}"`).join("\n")}`,
+        },
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("No response from AI");
+    const result = parseAIResponse(content);
+
+    // Test the generated regex against the test cases
+    const testResults = [];
+    let allTestsPassed = true;
+
+    try {
+      const regex = new RegExp(result.regex);
+
+      for (const testCase of testCases) {
+        const actualResult = regex.test(testCase.text);
+        const passed = testCase.isValid === actualResult;
+
+        if (!passed) {
+          allTestsPassed = false;
+        }
+
+        testResults.push({
+          text: testCase.text,
+          isValid: testCase.isValid,
+          actualResult,
+          passed,
+        });
+      }
+    } catch (regexError) {
+      console.warn("Invalid regex generated:", result.regex, regexError);
+      allTestsPassed = false;
+
+      // Mark all tests as failed
+      for (const testCase of testCases) {
+        testResults.push({
+          text: testCase.text,
+          isValid: testCase.isValid,
+          actualResult: false,
+          passed: false,
+        });
+      }
+    }
+
+    return {
+      regex: result.regex,
+      explanation: result.explanation,
+      testResults,
+      confidence: result.confidence,
+      allTestsPassed,
+    };
+  } catch (error) {
+    console.error("AI regex generation error:", error);
+    throw new Error("Failed to generate regex");
+  }
+}
+
+// Legacy function for backward compatibility
 export async function generateRegexFromDescriptionWithRetry(
   description: string,
   maxRetries: number = 3
 ): Promise<{ steps: GenerationStep[]; finalResult: RegexGeneration }> {
-  const steps: GenerationStep[] = [];
-  let currentStep = 1;
-  let previousFailures: string[] = [];
-
-  while (currentStep <= maxRetries) {
-    try {
-      const contextMessage =
-        currentStep > 1
-          ? `Previous attempts failed. Problems encountered:\n${previousFailures.join(
-              "\n"
-            )}\n\nImprove the regex to address these issues.`
-          : "";
-
-      const response = await openai.chat.completions.create({
-        model: "anthropic/claude-3.5-sonnet",
-        messages: [
-          {
-            role: "system",
-            content: `You are a regex expert. Generate regex patterns based on natural language descriptions. 
-            ${contextMessage}
-            Return a JSON object with:
-            - regex: the regex pattern (escaped for JavaScript)
-            - explanation: plain English explanation
-            - testCases: array of {text, isValid} objects (4 valid, 4 invalid examples that test edge cases)
-            - confidence: number 0-100
-            
-            For test cases, include:
-            - Basic valid examples
-            - Edge cases that should match
-            - Common invalid variations
-            - Boundary cases
-            Focus on practical, commonly used patterns. Make sure the regex actually works with your test cases.`,
-          },
-          {
-            role: "user",
-            content: `Generate a regex for: ${description}`,
-          },
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) throw new Error("No response from AI");
-
-      const result = JSON.parse(content);
-
-      // Validate test cases against the generated regex
-      let failedTests = 0;
-      let failureReasons: string[] = [];
-
-      if (result.testCases && Array.isArray(result.testCases)) {
-        try {
-          const regex = new RegExp(result.regex);
-          result.testCases = result.testCases.map(testCase => {
-            const actualResult = regex.test(testCase.text);
-            const isCorrect = testCase.isValid === actualResult;
-            if (!isCorrect) {
-              failedTests++;
-              failureReasons.push(
-                `Expected "${testCase.text}" to ${testCase.isValid ? "match" : "not match"} but it ${
-                  actualResult ? "matched" : "did not match"
-                }`
-              );
-            }
-            return {
-              ...testCase,
-              actualResult,
-              isValid: testCase.isValid, // Keep original expectation
-            };
-          });
-        } catch (regexError) {
-          console.warn("Invalid regex generated:", result.regex, regexError);
-          failureReasons.push(`Invalid regex syntax: ${regexError.message}`);
-          result.testCases = result.testCases.map(testCase => ({
-            ...testCase,
-            actualResult: false,
-          }));
-          failedTests = result.testCases.length;
-        }
-      }
-
-      // Add failure reasons to context for next retry
-      if (failureReasons.length > 0) {
-        previousFailures = previousFailures.concat(failureReasons);
-      }
-
-      const step: GenerationStep = {
-        step: currentStep,
+  // For now, just use the old single-step approach
+  const result = await generateRegexFromDescription(description);
+  return {
+    steps: [
+      {
+        step: 1,
         regex: result.regex,
         explanation: result.explanation,
         testCases: result.testCases,
         confidence: result.confidence,
-        failedTests,
-        status: failedTests === 0 ? "success" : currentStep === maxRetries ? "failed" : "retrying",
-      };
-
-      steps.push(step);
-
-      // If all tests pass or we've reached max retries, return the result
-      if (failedTests === 0 || currentStep === maxRetries) {
-        return { steps, finalResult: result };
-      }
-
-      currentStep++;
-    } catch (error) {
-      console.error(`AI generation error on step ${currentStep}:`, error);
-      const errorStep: GenerationStep = {
-        step: currentStep,
-        regex: "",
-        explanation: "Failed to generate regex",
-        testCases: [],
-        confidence: 0,
         failedTests: 0,
-        status: "failed",
-      };
-      steps.push(errorStep);
-      throw new Error("Failed to generate regex");
-    }
-  }
-
-  throw new Error("Failed to generate regex after maximum retries");
+        status: "success" as const,
+      },
+    ],
+    finalResult: result,
+  };
 }
 
 export async function generateRegexFromDescription(description: string): Promise<RegexGeneration> {
@@ -177,7 +280,7 @@ export async function generateRegexFromDescription(description: string): Promise
 export async function analyzeRegexPattern(pattern: string): Promise<RegexAnalysis> {
   try {
     const response = await openai.chat.completions.create({
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-sonnet-4",
       messages: [
         {
           role: "system",
@@ -208,8 +311,7 @@ export async function analyzeRegexPattern(pattern: string): Promise<RegexAnalysi
 
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No response from AI");
-
-    const result = JSON.parse(content);
+    const result = parseAIResponse(content);
     return result;
   } catch (error) {
     console.error("AI analysis error:", error);
@@ -222,7 +324,7 @@ export async function generateRegexFromExamples(
 ): Promise<RegexGeneration> {
   try {
     const response = await openai.chat.completions.create({
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-sonnet-4",
       messages: [
         {
           role: "system",
@@ -247,8 +349,7 @@ export async function generateRegexFromExamples(
 
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error("No response from AI");
-
-    const result = JSON.parse(content);
+    const result = parseAIResponse(content);
 
     // Validate test cases against the generated regex
     if (result.testCases && Array.isArray(result.testCases)) {
@@ -277,7 +378,7 @@ export async function generateRegexFromExamples(
 export async function suggestRegexFix(pattern: string, error: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-sonnet-4",
       messages: [
         {
           role: "system",

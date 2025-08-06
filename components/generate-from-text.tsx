@@ -5,27 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Zap, CheckCircle, XCircle, Plus, RotateCcw, X, Sparkles, PlayCircle } from "lucide-react";
+import {
+  Copy,
+  Zap,
+  CheckCircle,
+  XCircle,
+  Plus,
+  RotateCcw,
+  X,
+  Sparkles,
+  PlayCircle,
+  ArrowRight,
+  Edit3,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { RegexHighlighter } from "@/components/regex-highlighter";
-import { generateRegexWithRetryAction } from "@/app/actions";
+import { generateTestCasesAction, generateRegexFromTestCasesAction } from "@/app/actions";
+
+// Current workflow step
+type WorkflowStep = "description" | "test-cases" | "regex-generation" | "results";
 
 interface TestCase {
   id: string;
   text: string;
   isValid: boolean;
   actualResult?: boolean;
-}
-
-interface GenerationStep {
-  step: number;
-  regex: string;
-  explanation: string;
-  testCases: TestCase[];
-  confidence: number;
-  failedTests: number;
-  status: "success" | "failed" | "retrying";
+  passed?: boolean;
 }
 
 interface GenerateFromTextProps {
@@ -35,80 +41,148 @@ interface GenerateFromTextProps {
     explanation: string;
     testCases: TestCase[];
     isGenerating: boolean;
-    generationSteps: GenerationStep[];
+    generationSteps: any[];
   };
   updateState: (updates: Partial<GenerateFromTextProps["state"]>) => void;
 }
 
 export function GenerateFromText({ state, updateState }: GenerateFromTextProps) {
-  const { description, generatedRegex, explanation, testCases, isGenerating, generationSteps } = state;
+  const { description } = state;
+
+  // Step-by-step workflow state
+  const [currentStep, setCurrentStep] = useState<WorkflowStep>("description");
+  const [isGeneratingTestCases, setIsGeneratingTestCases] = useState(false);
+  const [isGeneratingRegex, setIsGeneratingRegex] = useState(false);
+  const [generatedTestCases, setGeneratedTestCases] = useState<TestCase[]>([]);
+  const [testCasesExplanation, setTestCasesExplanation] = useState("");
+  const [finalRegex, setFinalRegex] = useState("");
+  const [regexExplanation, setRegexExplanation] = useState("");
+  const [testResults, setTestResults] = useState<TestCase[]>([]);
+  const [confidence, setConfidence] = useState(0);
+  const [allTestsPassed, setAllTestsPassed] = useState(false);
+  const [previousAttempt, setPreviousAttempt] = useState<{ regex: string; failures: string[] } | undefined>();
 
   const setDescription = (value: string) => updateState({ description: value });
-  const setGeneratedRegex = (value: string) => updateState({ generatedRegex: value });
-  const setExplanation = (value: string) => updateState({ explanation: value });
-  const setTestCases = (value: TestCase[]) => updateState({ testCases: value });
-  const setIsGenerating = (value: boolean) => updateState({ isGenerating: value });
-  const setGenerationSteps = (value: GenerationStep[]) => updateState({ generationSteps: value });
 
-  const generateRegex = async (isRetry = false) => {
+  // Step 1: Generate test cases
+  const generateTestCases = async () => {
     if (!description.trim()) return;
 
-    setIsGenerating(true);
-    if (!isRetry) {
-      setGeneratedRegex("");
-      setExplanation("");
-      setTestCases([]);
-      setGenerationSteps([]);
-    }
-
+    setIsGeneratingTestCases(true);
     try {
-      const result = await generateRegexWithRetryAction(description);
+      const result = await generateTestCasesAction(description);
 
-      setGeneratedRegex(result.finalResult.regex);
-      setExplanation(result.finalResult.explanation);
-      setTestCases(
-        result.finalResult.testCases.map((test, index) => ({
-          id: (index + 1).toString(),
-          text: test.text,
-          isValid: test.isValid,
-          actualResult: test.actualResult,
-        }))
-      );
-      setGenerationSteps(
-        result.steps.map(step => ({
-          ...step,
-          testCases: step.testCases.map((tc, index) => ({
-            id: (index + 1).toString(),
-            ...tc,
-          })),
-        }))
-      );
+      const testCasesWithIds = result.testCases.map((tc, index) => ({
+        id: (index + 1).toString(),
+        text: tc.text,
+        isValid: tc.isValid,
+      }));
+
+      setGeneratedTestCases(testCasesWithIds);
+      setTestCasesExplanation(result.explanation);
+      setCurrentStep("test-cases");
+      toast.success("Test cases generated! Review and approve them.");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      if (errorMessage.includes("API")) {
-        toast.error("AI service unavailable. Please check your connection and try again.");
-      } else if (errorMessage.includes("timeout")) {
-        toast.error("Request timed out. Please try again with a simpler description.");
-      } else {
-        toast.error(`Failed to generate regex: ${errorMessage}`);
-      }
-      console.error("Generation error:", error);
-
-      // Add error state to show user feedback
-      setExplanation("❌ Generation failed. Please try again or simplify your description.");
+      toast.error(`Failed to generate test cases: ${errorMessage}`);
+      console.error("Test case generation error:", error);
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingTestCases(false);
     }
   };
 
-  const hasFailedTests = testCases.some(tc => tc.actualResult !== tc.isValid);
-  const finalStep = generationSteps[generationSteps.length - 1];
-  const shouldShowRetry = hasFailedTests && finalStep?.status === "failed";
-  const allTestsPassed = testCases.length > 0 && !hasFailedTests;
+  // Step 2: Generate regex from approved test cases
+  const generateRegex = async () => {
+    if (generatedTestCases.length === 0) return;
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedRegex);
-    toast.success("Regex copied to clipboard!");
+    setIsGeneratingRegex(true);
+    try {
+      const testCasesData = generatedTestCases.map(tc => ({
+        text: tc.text,
+        isValid: tc.isValid,
+      }));
+
+      const result = await generateRegexFromTestCasesAction(description, testCasesData, previousAttempt);
+
+      setFinalRegex(result.regex);
+      setRegexExplanation(result.explanation);
+      setConfidence(result.confidence);
+      setAllTestsPassed(result.allTestsPassed);
+
+      // Convert test results to our format
+      const resultsWithIds = result.testResults.map((tr, index) => ({
+        id: (index + 1).toString(),
+        text: tr.text,
+        isValid: tr.isValid,
+        actualResult: tr.actualResult,
+        passed: tr.passed,
+      }));
+
+      setTestResults(resultsWithIds);
+      setCurrentStep("results");
+
+      if (result.allTestsPassed) {
+        toast.success("Regex generated successfully! All tests passed.");
+      } else {
+        toast.warning("Regex generated but some tests failed. Review and retry if needed.");
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Failed to generate regex: ${errorMessage}`);
+      console.error("Regex generation error:", error);
+    } finally {
+      setIsGeneratingRegex(false);
+    }
+  };
+
+  // Retry workflow - go back to test cases with context
+  const retryWorkflow = () => {
+    if (finalRegex && testResults.length > 0) {
+      const failures = testResults
+        .filter(tr => !tr.passed)
+        .map(
+          tr =>
+            `Expected "${tr.text}" to ${tr.isValid ? "match" : "not match"} but it ${
+              tr.actualResult ? "matched" : "did not match"
+            }`
+        );
+
+      setPreviousAttempt({ regex: finalRegex, failures });
+    }
+
+    setCurrentStep("test-cases");
+    setFinalRegex("");
+    setRegexExplanation("");
+    setTestResults([]);
+    setAllTestsPassed(false);
+    toast.info("Retrying generation with improved context...");
+  };
+
+  // Start over completely
+  const startOver = () => {
+    setCurrentStep("description");
+    setGeneratedTestCases([]);
+    setTestCasesExplanation("");
+    setFinalRegex("");
+    setRegexExplanation("");
+    setTestResults([]);
+    setConfidence(0);
+    setAllTestsPassed(false);
+    setPreviousAttempt(undefined);
+    setDescription("");
+  };
+
+  // Edit test cases
+  const editTestCase = (id: string, text: string) => {
+    setGeneratedTestCases(prev => prev.map(tc => (tc.id === id ? { ...tc, text } : tc)));
+  };
+
+  const toggleTestValidity = (id: string) => {
+    setGeneratedTestCases(prev => prev.map(tc => (tc.id === id ? { ...tc, isValid: !tc.isValid } : tc)));
+  };
+
+  const deleteTestCase = (id: string) => {
+    setGeneratedTestCases(prev => prev.filter(tc => tc.id !== id));
   };
 
   const addTestCase = (isValid: boolean) => {
@@ -117,232 +191,162 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
       text: "",
       isValid,
     };
-    setTestCases([...testCases, newTest]);
+    setGeneratedTestCases(prev => [...prev, newTest]);
   };
 
-  const updateTestCase = (id: string, text: string) => {
-    setTestCases(testCases.map(test => (test.id === id ? { ...test, text } : test)));
-  };
-
-  const deleteTestCase = (id: string) => {
-    setTestCases(testCases.filter(test => test.id !== id));
-  };
-
-  const toggleTestValidity = (id: string) => {
-    setTestCases(testCases.map(test => (test.id === id ? { ...test, isValid: !test.isValid } : test)));
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(finalRegex);
+    toast.success("Regex copied to clipboard!");
   };
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Generate Regex from Natural Language</h1>
-        <p className="text-zinc-400">Describe what you want to match and get a regex pattern instantly</p>
-        {!generatedRegex && !description && (
-          <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-300 text-sm mb-3">
-              💡 <strong>Tip:</strong> Try describing patterns like "find all email addresses", "match phone numbers",
-              or "extract URLs from text". Our AI will generate the perfect regex for you!
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {["find all email addresses", "match phone numbers", "extract URLs from text"].map((example, index) => (
-                <Button
-                  key={index}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDescription(example)}
-                  className="text-blue-300 hover:text-white hover:bg-blue-500/20 text-left justify-start"
-                >
-                  "{example}"
-                </Button>
-              ))}
+        <h1 className="text-3xl font-bold text-white mb-2">Step-by-Step Regex Generation</h1>
+        <p className="text-zinc-400">Follow the guided workflow to create perfect regex patterns</p>
+
+        {/* Progress indicator */}
+        <div className="mt-6 flex items-center gap-4">
+          <div
+            className={`flex items-center gap-2 ${
+              currentStep === "description"
+                ? "text-blue-400"
+                : currentStep === "test-cases" || currentStep === "results"
+                ? "text-green-400"
+                : "text-zinc-400"
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep === "description"
+                  ? "bg-blue-500"
+                  : currentStep === "test-cases" || currentStep === "results"
+                  ? "bg-green-500"
+                  : "bg-zinc-700"
+              }`}
+            >
+              1
             </div>
+            <span>Describe Pattern</span>
           </div>
-        )}
+          <ArrowRight className="w-4 h-4 text-zinc-500" />
+
+          <div
+            className={`flex items-center gap-2 ${
+              currentStep === "test-cases"
+                ? "text-blue-400"
+                : currentStep === "results"
+                ? "text-green-400"
+                : "text-zinc-400"
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep === "test-cases"
+                  ? "bg-blue-500"
+                  : currentStep === "results"
+                  ? "bg-green-500"
+                  : "bg-zinc-700"
+              }`}
+            >
+              2
+            </div>
+            <span>Review Test Cases</span>
+          </div>
+          <ArrowRight className="w-4 h-4 text-zinc-500" />
+
+          <div className={`flex items-center gap-2 ${currentStep === "results" ? "text-green-400" : "text-zinc-400"}`}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep === "results" ? "bg-green-500" : "bg-zinc-700"
+              }`}
+            >
+              3
+            </div>
+            <span>Generate & Test</span>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6">
-        <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-500" />
-              Describe Your Pattern (AI-Powered)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="e.g., 'find all email addresses' or 'extract dates in DD/MM/YYYY format'"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && e.ctrlKey && description.trim() && !isGenerating) {
-                  generateRegex();
-                }
-              }}
-              className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 min-h-[100px] resize-none"
-            />
-            <div className="flex gap-2 items-center">
-              <Button variant="default" onClick={() => generateRegex()} disabled={!description.trim() || isGenerating}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                {isGenerating ? "Generating..." : "Generate Regex"}
-              </Button>
-              {description && (
+        {/* Step 1: Description */}
+        {currentStep === "description" && (
+          <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-500" />
+                Step 1: Describe Your Pattern
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="e.g., 'find all email addresses' or 'extract dates in DD/MM/YYYY format'"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && e.ctrlKey && description.trim() && !isGeneratingTestCases) {
+                    generateTestCases();
+                  }
+                }}
+                className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 min-h-[100px] resize-none"
+              />
+              <div className="flex gap-2 items-center">
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDescription("")}
-                  className="text-zinc-400 hover:text-white"
+                  variant="default"
+                  onClick={generateTestCases}
+                  disabled={!description.trim() || isGeneratingTestCases}
                 >
-                  Clear
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {isGeneratingTestCases ? "Generating Test Cases..." : "Generate Test Cases"}
                 </Button>
-              )}
-              <span className="text-xs text-zinc-500 ml-auto">Ctrl+Enter to generate</span>
-            </div>
-          </CardContent>
-        </Card>
+                {description && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDescription("")}
+                    className="text-zinc-400 hover:text-white"
+                  >
+                    Clear
+                  </Button>
+                )}
+                <span className="text-xs text-zinc-500 ml-auto">Ctrl+Enter to generate</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {generatedRegex && (
+        {/* Step 2: Test Cases Review */}
+        {currentStep === "test-cases" && (
           <>
             <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-white">Generated Pattern</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setGeneratedRegex("");
-                      setExplanation("");
-                      setTestCases([]);
-                    }}
-                    className="text-zinc-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Clear All
-                  </Button>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    Step 2: Review & Approve Test Cases
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentStep("description")}>
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit Description
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={generateTestCases} disabled={isGeneratingTestCases}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      {isGeneratingTestCases ? "Regenerating..." : "Regenerate Test Cases"}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-zinc-800/50 backdrop-blur-sm p-3 rounded-lg">
-                    <RegexHighlighter pattern={generatedRegex} className="text-green-400" />
-                  </div>
-                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
-                    <Copy className="w-4 h-4" />
-                  </Button>
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    <strong>Pattern:</strong> {description}
+                  </p>
+                  {testCasesExplanation && <p className="text-blue-200 text-xs mt-2">{testCasesExplanation}</p>}
                 </div>
-                <p className="text-zinc-300 text-sm">{explanation}</p>
-                {allTestsPassed && (
-                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-                      <CheckCircle className="w-4 h-4" />
-                      All test cases passed!
-                    </div>
-                    <p className="text-green-300 text-xs mt-1">
-                      Your regex is working correctly with all generated test cases.
-                    </p>
-                  </div>
-                )}
-                {shouldShowRetry && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-red-400 text-sm font-medium">
-                      <XCircle className="w-4 h-4" />
-                      Some test cases failed
-                    </div>
-                    <p className="text-red-300 text-xs mt-1">
-                      The generated regex doesn't pass all test cases. Click "Retry Generation" to improve it.
-                    </p>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  {shouldShowRetry && (
-                    <Button variant="destructive" size="sm" onClick={() => generateRegex(true)} disabled={isGenerating}>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      {isGenerating ? "Retrying..." : "Retry Generation"}
-                    </Button>
-                  )}
-                  <Button
-                    variant="info"
-                    size="sm"
-                    onClick={() => {
-                      // Store regex in localStorage to pass to sandbox
-                      localStorage.setItem("sandboxRegex", generatedRegex);
-                      localStorage.setItem("sandboxTestText", testCases.map(tc => tc.text).join("\n"));
-                      // Trigger navigation to sandbox
-                      window.dispatchEvent(new CustomEvent("navigateToSandbox"));
-                      toast.success("Regex copied to sandbox!");
-                    }}
-                  >
-                    <PlayCircle className="w-4 h-4 mr-2" />
-                    Test in Sandbox
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
 
-            {generationSteps.length > 1 && (
-              <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <RotateCcw className="w-5 h-5 text-blue-500" />
-                    Generation History
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {generationSteps.map((step, index) => (
-                      <div key={step.step} className="p-4 bg-zinc-800/50 backdrop-blur-sm rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <Badge
-                              variant="outline"
-                              className={
-                                step.status === "success"
-                                  ? "border-green-500 text-green-400"
-                                  : step.status === "failed"
-                                  ? "border-red-500 text-red-400"
-                                  : "border-yellow-500 text-yellow-400"
-                              }
-                            >
-                              Step {step.step}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className={
-                                step.failedTests === 0
-                                  ? "border-green-500 text-green-400"
-                                  : "border-red-500 text-red-400"
-                              }
-                            >
-                              {step.failedTests === 0 ? "All Tests Pass" : `${step.failedTests} Failed`}
-                            </Badge>
-                            {step.status === "retrying" && (
-                              <div className="flex items-center gap-2 text-yellow-400">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
-                                <span className="text-sm">Retrying...</span>
-                              </div>
-                            )}
-                          </div>
-                          <Badge variant="outline" className="text-zinc-400">
-                            {step.confidence}% Confidence
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="bg-zinc-700/50 backdrop-blur-sm p-2 rounded">
-                            <RegexHighlighter pattern={step.regex} className="text-sm" />
-                          </div>
-                          <p className="text-zinc-300 text-sm">{step.explanation}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {testCases.length > 0 && (
-              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-white">Test Cases</h3>
+                  <h3 className="text-lg font-semibold text-white">Test Cases</h3>
                   <div className="flex gap-2">
                     <Button variant="success" size="sm" onClick={() => addTestCase(true)}>
                       <Plus className="w-4 h-4 mr-2" />
@@ -356,33 +360,18 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                 </div>
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {testCases.map(testCase => (
+                  {generatedTestCases.map(testCase => (
                     <Card key={testCase.id} className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
-                          <div className="flex flex-col gap-1">
-                            <Badge
-                              variant="outline"
-                              className={
-                                testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
-                              }
-                            >
-                              {testCase.isValid ? "✓ Positive Case" : "✗ Negative Case"}
-                            </Badge>
-                            {testCase.actualResult !== undefined && (
-                              <Badge
-                                variant="outline"
-                                className={
-                                  testCase.actualResult === testCase.isValid
-                                    ? "border-green-500 text-green-400"
-                                    : "border-red-500 text-red-400"
-                                }
-                              >
-                                {testCase.actualResult === testCase.isValid ? "✓ Correct" : "✗ Incorrect"}
-                                {testCase.actualResult !== testCase.isValid && " ❌"}
-                              </Badge>
-                            )}
-                          </div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                            }
+                          >
+                            {testCase.isValid ? "✓ Should Match" : "✗ Should NOT Match"}
+                          </Badge>
                           <div className="flex gap-1">
                             <Button
                               variant="outline"
@@ -405,15 +394,165 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                         <Input
                           placeholder="Enter test text..."
                           value={testCase.text}
-                          onChange={e => updateTestCase(testCase.id, e.target.value)}
+                          onChange={e => editTestCase(testCase.id, e.target.value)}
                           className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 font-mono text-sm"
                         />
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              </div>
-            )}
+
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    variant="default"
+                    onClick={generateRegex}
+                    disabled={
+                      generatedTestCases.length === 0 ||
+                      generatedTestCases.some(tc => !tc.text.trim()) ||
+                      isGeneratingRegex
+                    }
+                  >
+                    <Zap className="w-4 h-4 mr-2" />
+                    {isGeneratingRegex ? "Generating Regex..." : "Generate Regex"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Step 3: Results */}
+        {currentStep === "results" && (
+          <>
+            <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    {allTestsPassed ? (
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-500" />
+                    )}
+                    Step 3: Generated Regex
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentStep("test-cases")}>
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit Test Cases
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={startOver}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Start Over
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-zinc-800/50 backdrop-blur-sm p-3 rounded-lg">
+                    <RegexHighlighter pattern={finalRegex} className="text-green-400" />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-zinc-300 text-sm">{regexExplanation}</p>
+
+                {allTestsPassed ? (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
+                      <CheckCircle className="w-4 h-4" />
+                      All test cases passed! ({confidence}% confidence)
+                    </div>
+                    <p className="text-green-300 text-xs mt-1">Your regex is working correctly with all test cases.</p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-400 text-sm font-medium">
+                      <XCircle className="w-4 h-4" />
+                      Some test cases failed ({confidence}% confidence)
+                    </div>
+                    <p className="text-red-300 text-xs mt-1">
+                      The generated regex doesn't pass all test cases. Click "Retry Generation" to improve it.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {!allTestsPassed && (
+                    <Button variant="destructive" size="sm" onClick={retryWorkflow} disabled={isGeneratingRegex}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Retry Generation
+                    </Button>
+                  )}
+                  <Button
+                    variant="info"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.setItem("sandboxRegex", finalRegex);
+                      localStorage.setItem("sandboxTestText", testResults.map(tc => tc.text).join("\n"));
+                      window.dispatchEvent(new CustomEvent("navigateToSandbox"));
+                      toast.success("Regex copied to sandbox!");
+                    }}
+                  >
+                    <PlayCircle className="w-4 h-4 mr-2" />
+                    Test in Sandbox
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Test Results */}
+            <Card className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+              <CardHeader>
+                <CardTitle className="text-white">Test Results</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {testResults.map(result => (
+                    <Card
+                      key={result.id}
+                      className={`bg-zinc-900/40 backdrop-blur-sm border ${
+                        result.passed ? "border-green-500/30" : "border-red-500/30"
+                      }`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex flex-col gap-1">
+                            <Badge
+                              variant="outline"
+                              className={
+                                result.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                              }
+                            >
+                              {result.isValid ? "✓ Should Match" : "✗ Should NOT Match"}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={
+                                result.passed ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                              }
+                            >
+                              {result.actualResult ? "✓ Does match" : "✗ Does not match"}
+                            </Badge>
+                          </div>
+                          {result.passed ? (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-500" />
+                          )}
+                        </div>
+                        <div className="bg-zinc-800/50 p-2 rounded text-sm font-mono text-white">{result.text}</div>
+                        <div className="mt-2 text-xs text-zinc-400">
+                          Expected: {result.isValid ? "Match" : "No Match"} | Actual:{" "}
+                          {result.actualResult ? "Match" : "No Match"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
