@@ -1,5 +1,6 @@
 import { Search, Code, FileText, Play, BookOpen, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface SidebarProps {
   activeTab: string;
@@ -53,9 +54,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     <div className="w-full md:w-64 bg-zinc-900/80 backdrop-blur-sm border-b md:border-r md:border-b-0 border-zinc-800/50 flex flex-col md:h-screen md:fixed md:left-0 md:top-0 md:z-50">
       <div className="p-4 md:p-6 border-b border-zinc-800/50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Code className="w-4 h-4 text-white" />
-          </div>
+          <Image src="/icon.png" alt="Regex Hub" width={40} height={40} />
           <div>
             <h1 className="text-lg font-semibold text-white">Regex Hub</h1>
             <p className="text-xs text-slate-400">Pattern Intelligence</p>

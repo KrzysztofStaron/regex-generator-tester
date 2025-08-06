@@ -38,25 +38,38 @@ interface AnalyzeRegexProps {
     isAnalyzing: boolean;
     suggestedFix: string;
     isFixing: boolean;
+    // Step-by-step workflow state
+    currentStep?: "input" | "analysis" | "improvement" | "results";
+    isGeneratingImproved?: boolean;
+    improvedRegex?: string;
+    improvedExplanation?: string;
+    improvedConfidence?: number;
+    selectedSuggestions?: string[];
+    generatedTestCases?: Array<{ text: string; shouldMatch: boolean }>;
+    testResults?: Array<{ text: string; isValid: boolean; actualResult: boolean; passed: boolean }>;
+    allTestsPassed?: boolean;
   };
   updateState: (updates: Partial<AnalyzeRegexProps["state"]>) => void;
 }
 
 export function AnalyzeRegex({ state, updateState }: AnalyzeRegexProps) {
-  const { regex, analysis, error, isAnalyzing, suggestedFix, isFixing } = state;
-
-  // Step-by-step workflow state
-  const [currentStep, setCurrentStep] = useState<AnalyzeWorkflowStep>("input");
-  const [isGeneratingImproved, setIsGeneratingImproved] = useState(false);
-  const [improvedRegex, setImprovedRegex] = useState("");
-  const [improvedExplanation, setImprovedExplanation] = useState("");
-  const [improvedConfidence, setImprovedConfidence] = useState(0);
-  const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
-  const [generatedTestCases, setGeneratedTestCases] = useState<Array<{ text: string; shouldMatch: boolean }>>([]);
-  const [testResults, setTestResults] = useState<
-    Array<{ text: string; isValid: boolean; actualResult: boolean; passed: boolean }>
-  >([]);
-  const [allTestsPassed, setAllTestsPassed] = useState(false);
+  const {
+    regex,
+    analysis,
+    error,
+    isAnalyzing,
+    suggestedFix,
+    isFixing,
+    currentStep = "input",
+    isGeneratingImproved = false,
+    improvedRegex = "",
+    improvedExplanation = "",
+    improvedConfidence = 0,
+    selectedSuggestions = [],
+    generatedTestCases = [],
+    testResults = [],
+    allTestsPassed = false,
+  } = state;
 
   const setRegex = (value: string) => updateState({ regex: value });
   const setAnalysis = (value: any) => updateState({ analysis: value });
@@ -64,6 +77,17 @@ export function AnalyzeRegex({ state, updateState }: AnalyzeRegexProps) {
   const setIsAnalyzing = (value: boolean) => updateState({ isAnalyzing: value });
   const setSuggestedFix = (value: string) => updateState({ suggestedFix: value });
   const setIsFixing = (value: boolean) => updateState({ isFixing: value });
+  const setCurrentStep = (value: AnalyzeWorkflowStep) => updateState({ currentStep: value });
+  const setIsGeneratingImproved = (value: boolean) => updateState({ isGeneratingImproved: value });
+  const setImprovedRegex = (value: string) => updateState({ improvedRegex: value });
+  const setImprovedExplanation = (value: string) => updateState({ improvedExplanation: value });
+  const setImprovedConfidence = (value: number) => updateState({ improvedConfidence: value });
+  const setSelectedSuggestions = (value: string[]) => updateState({ selectedSuggestions: value });
+  const setGeneratedTestCases = (value: Array<{ text: string; shouldMatch: boolean }>) =>
+    updateState({ generatedTestCases: value });
+  const setTestResults = (value: Array<{ text: string; isValid: boolean; actualResult: boolean; passed: boolean }>) =>
+    updateState({ testResults: value });
+  const setAllTestsPassed = (value: boolean) => updateState({ allTestsPassed: value });
 
   const analyzePattern = async () => {
     setError("");
@@ -222,9 +246,10 @@ export function AnalyzeRegex({ state, updateState }: AnalyzeRegexProps) {
 
   // Toggle suggestion selection
   const toggleSuggestion = (suggestion: string) => {
-    setSelectedSuggestions(prev =>
-      prev.includes(suggestion) ? prev.filter(s => s !== suggestion) : [...prev, suggestion]
-    );
+    const updatedSuggestions = selectedSuggestions.includes(suggestion)
+      ? selectedSuggestions.filter(s => s !== suggestion)
+      : [...selectedSuggestions, suggestion];
+    setSelectedSuggestions(updatedSuggestions);
   };
 
   const getSuggestedFix = async () => {

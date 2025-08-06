@@ -42,27 +42,51 @@ interface GenerateFromTextProps {
     testCases: TestCase[];
     isGenerating: boolean;
     generationSteps: any[];
+    // Step-by-step workflow state
+    currentStep?: "description" | "test-cases" | "regex-generation" | "results";
+    isGeneratingTestCases?: boolean;
+    isGeneratingRegex?: boolean;
+    generatedTestCases?: TestCase[];
+    testCasesExplanation?: string;
+    finalRegex?: string;
+    regexExplanation?: string;
+    testResults?: TestCase[];
+    confidence?: number;
+    allTestsPassed?: boolean;
+    previousAttempt?: { regex: string; failures: string[] } | undefined;
   };
   updateState: (updates: Partial<GenerateFromTextProps["state"]>) => void;
 }
 
 export function GenerateFromText({ state, updateState }: GenerateFromTextProps) {
-  const { description } = state;
-
-  // Step-by-step workflow state
-  const [currentStep, setCurrentStep] = useState<WorkflowStep>("description");
-  const [isGeneratingTestCases, setIsGeneratingTestCases] = useState(false);
-  const [isGeneratingRegex, setIsGeneratingRegex] = useState(false);
-  const [generatedTestCases, setGeneratedTestCases] = useState<TestCase[]>([]);
-  const [testCasesExplanation, setTestCasesExplanation] = useState("");
-  const [finalRegex, setFinalRegex] = useState("");
-  const [regexExplanation, setRegexExplanation] = useState("");
-  const [testResults, setTestResults] = useState<TestCase[]>([]);
-  const [confidence, setConfidence] = useState(0);
-  const [allTestsPassed, setAllTestsPassed] = useState(false);
-  const [previousAttempt, setPreviousAttempt] = useState<{ regex: string; failures: string[] } | undefined>();
+  const {
+    description,
+    currentStep = "description",
+    isGeneratingTestCases = false,
+    isGeneratingRegex = false,
+    generatedTestCases = [],
+    testCasesExplanation = "",
+    finalRegex = "",
+    regexExplanation = "",
+    testResults = [],
+    confidence = 0,
+    allTestsPassed = false,
+    previousAttempt = undefined,
+  } = state;
 
   const setDescription = (value: string) => updateState({ description: value });
+  const setCurrentStep = (value: WorkflowStep) => updateState({ currentStep: value });
+  const setIsGeneratingTestCases = (value: boolean) => updateState({ isGeneratingTestCases: value });
+  const setIsGeneratingRegex = (value: boolean) => updateState({ isGeneratingRegex: value });
+  const setGeneratedTestCases = (value: TestCase[]) => updateState({ generatedTestCases: value });
+  const setTestCasesExplanation = (value: string) => updateState({ testCasesExplanation: value });
+  const setFinalRegex = (value: string) => updateState({ finalRegex: value });
+  const setRegexExplanation = (value: string) => updateState({ regexExplanation: value });
+  const setTestResults = (value: TestCase[]) => updateState({ testResults: value });
+  const setConfidence = (value: number) => updateState({ confidence: value });
+  const setAllTestsPassed = (value: boolean) => updateState({ allTestsPassed: value });
+  const setPreviousAttempt = (value: { regex: string; failures: string[] } | undefined) =>
+    updateState({ previousAttempt: value });
 
   // Step 1: Generate test cases
   const generateTestCases = async () => {
@@ -209,15 +233,18 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
 
   // Edit test cases
   const editTestCase = (id: string, text: string) => {
-    setGeneratedTestCases(prev => prev.map(tc => (tc.id === id ? { ...tc, text } : tc)));
+    const updatedTestCases = generatedTestCases.map(tc => (tc.id === id ? { ...tc, text } : tc));
+    setGeneratedTestCases(updatedTestCases);
   };
 
   const toggleTestValidity = (id: string) => {
-    setGeneratedTestCases(prev => prev.map(tc => (tc.id === id ? { ...tc, isValid: !tc.isValid } : tc)));
+    const updatedTestCases = generatedTestCases.map(tc => (tc.id === id ? { ...tc, isValid: !tc.isValid } : tc));
+    setGeneratedTestCases(updatedTestCases);
   };
 
   const deleteTestCase = (id: string) => {
-    setGeneratedTestCases(prev => prev.filter(tc => tc.id !== id));
+    const updatedTestCases = generatedTestCases.filter(tc => tc.id !== id);
+    setGeneratedTestCases(updatedTestCases);
   };
 
   const addTestCase = (isValid: boolean) => {
@@ -226,7 +253,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
       text: "",
       isValid,
     };
-    setGeneratedTestCases(prev => [...prev, newTest]);
+    setGeneratedTestCases([...generatedTestCases, newTest]);
   };
 
   const copyToClipboard = () => {

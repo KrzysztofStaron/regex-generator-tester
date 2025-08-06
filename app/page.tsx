@@ -19,6 +19,21 @@ export default function Home() {
   const [generateGenerationSteps, setGenerateGenerationSteps] = useState<any[]>([]);
   const [generateIsGenerating, setGenerateIsGenerating] = useState(false);
 
+  // Generate tab step-by-step workflow state
+  const [generateCurrentStep, setGenerateCurrentStep] = useState<
+    "description" | "test-cases" | "regex-generation" | "results"
+  >("description");
+  const [generateIsGeneratingTestCases, setGenerateIsGeneratingTestCases] = useState(false);
+  const [generateIsGeneratingRegex, setGenerateIsGeneratingRegex] = useState(false);
+  const [generateGeneratedTestCases, setGenerateGeneratedTestCases] = useState<any[]>([]);
+  const [generateTestCasesExplanation, setGenerateTestCasesExplanation] = useState("");
+  const [generateFinalRegex, setGenerateFinalRegex] = useState("");
+  const [generateRegexExplanation, setGenerateRegexExplanation] = useState("");
+  const [generateTestResults, setGenerateTestResults] = useState<any[]>([]);
+  const [generateConfidence, setGenerateConfidence] = useState(0);
+  const [generateAllTestsPassed, setGenerateAllTestsPassed] = useState(false);
+  const [generatePreviousAttempt, setGeneratePreviousAttempt] = useState<any>(undefined);
+
   // Analyze tab state
   const [analyzeRegex, setAnalyzeRegex] = useState("");
   const [analyzeAnalysis, setAnalyzeAnalysis] = useState<any>(null);
@@ -26,6 +41,23 @@ export default function Home() {
   const [analyzeIsAnalyzing, setAnalyzeIsAnalyzing] = useState(false);
   const [analyzeSuggestedFix, setAnalyzeSuggestedFix] = useState("");
   const [analyzeIsFixing, setAnalyzeIsFixing] = useState(false);
+
+  // Analyze tab step-by-step workflow state
+  const [analyzeCurrentStep, setAnalyzeCurrentStep] = useState<"input" | "analysis" | "improvement" | "results">(
+    "input"
+  );
+  const [analyzeIsGeneratingImproved, setAnalyzeIsGeneratingImproved] = useState(false);
+  const [analyzeImprovedRegex, setAnalyzeImprovedRegex] = useState("");
+  const [analyzeImprovedExplanation, setAnalyzeImprovedExplanation] = useState("");
+  const [analyzeImprovedConfidence, setAnalyzeImprovedConfidence] = useState(0);
+  const [analyzeSelectedSuggestions, setAnalyzeSelectedSuggestions] = useState<string[]>([]);
+  const [analyzeGeneratedTestCases, setAnalyzeGeneratedTestCases] = useState<
+    Array<{ text: string; shouldMatch: boolean }>
+  >([]);
+  const [analyzeTestResults, setAnalyzeTestResults] = useState<
+    Array<{ text: string; isValid: boolean; actualResult: boolean; passed: boolean }>
+  >([]);
+  const [analyzeAllTestsPassed, setAnalyzeAllTestsPassed] = useState(false);
 
   // Examples tab state
   const [examplesList, setExamplesList] = useState([{ id: "1", input: "", output: "" }]);
@@ -75,6 +107,18 @@ user123+tag@site.org
               testCases: generateTestCases,
               generationSteps: generateGenerationSteps,
               isGenerating: generateIsGenerating,
+              // Step-by-step workflow state
+              currentStep: generateCurrentStep,
+              isGeneratingTestCases: generateIsGeneratingTestCases,
+              isGeneratingRegex: generateIsGeneratingRegex,
+              generatedTestCases: generateGeneratedTestCases,
+              testCasesExplanation: generateTestCasesExplanation,
+              finalRegex: generateFinalRegex,
+              regexExplanation: generateRegexExplanation,
+              testResults: generateTestResults,
+              confidence: generateConfidence,
+              allTestsPassed: generateAllTestsPassed,
+              previousAttempt: generatePreviousAttempt,
             }}
             updateState={updates => {
               if (updates.description !== undefined) setGenerateDescription(updates.description);
@@ -83,6 +127,20 @@ user123+tag@site.org
               if (updates.testCases !== undefined) setGenerateTestCases(updates.testCases);
               if (updates.generationSteps !== undefined) setGenerateGenerationSteps(updates.generationSteps);
               if (updates.isGenerating !== undefined) setGenerateIsGenerating(updates.isGenerating);
+              // Step-by-step workflow state updates
+              if (updates.currentStep !== undefined) setGenerateCurrentStep(updates.currentStep);
+              if (updates.isGeneratingTestCases !== undefined)
+                setGenerateIsGeneratingTestCases(updates.isGeneratingTestCases);
+              if (updates.isGeneratingRegex !== undefined) setGenerateIsGeneratingRegex(updates.isGeneratingRegex);
+              if (updates.generatedTestCases !== undefined) setGenerateGeneratedTestCases(updates.generatedTestCases);
+              if (updates.testCasesExplanation !== undefined)
+                setGenerateTestCasesExplanation(updates.testCasesExplanation);
+              if (updates.finalRegex !== undefined) setGenerateFinalRegex(updates.finalRegex);
+              if (updates.regexExplanation !== undefined) setGenerateRegexExplanation(updates.regexExplanation);
+              if (updates.testResults !== undefined) setGenerateTestResults(updates.testResults);
+              if (updates.confidence !== undefined) setGenerateConfidence(updates.confidence);
+              if (updates.allTestsPassed !== undefined) setGenerateAllTestsPassed(updates.allTestsPassed);
+              if (updates.previousAttempt !== undefined) setGeneratePreviousAttempt(updates.previousAttempt);
             }}
           />
         );
@@ -96,6 +154,16 @@ user123+tag@site.org
               isAnalyzing: analyzeIsAnalyzing,
               suggestedFix: analyzeSuggestedFix,
               isFixing: analyzeIsFixing,
+              // Step-by-step workflow state
+              currentStep: analyzeCurrentStep,
+              isGeneratingImproved: analyzeIsGeneratingImproved,
+              improvedRegex: analyzeImprovedRegex,
+              improvedExplanation: analyzeImprovedExplanation,
+              improvedConfidence: analyzeImprovedConfidence,
+              selectedSuggestions: analyzeSelectedSuggestions,
+              generatedTestCases: analyzeGeneratedTestCases,
+              testResults: analyzeTestResults,
+              allTestsPassed: analyzeAllTestsPassed,
             }}
             updateState={updates => {
               if (updates.regex !== undefined) setAnalyzeRegex(updates.regex);
@@ -104,6 +172,17 @@ user123+tag@site.org
               if (updates.isAnalyzing !== undefined) setAnalyzeIsAnalyzing(updates.isAnalyzing);
               if (updates.suggestedFix !== undefined) setAnalyzeSuggestedFix(updates.suggestedFix);
               if (updates.isFixing !== undefined) setAnalyzeIsFixing(updates.isFixing);
+              // Step-by-step workflow state updates
+              if (updates.currentStep !== undefined) setAnalyzeCurrentStep(updates.currentStep);
+              if (updates.isGeneratingImproved !== undefined)
+                setAnalyzeIsGeneratingImproved(updates.isGeneratingImproved);
+              if (updates.improvedRegex !== undefined) setAnalyzeImprovedRegex(updates.improvedRegex);
+              if (updates.improvedExplanation !== undefined) setAnalyzeImprovedExplanation(updates.improvedExplanation);
+              if (updates.improvedConfidence !== undefined) setAnalyzeImprovedConfidence(updates.improvedConfidence);
+              if (updates.selectedSuggestions !== undefined) setAnalyzeSelectedSuggestions(updates.selectedSuggestions);
+              if (updates.generatedTestCases !== undefined) setAnalyzeGeneratedTestCases(updates.generatedTestCases);
+              if (updates.testResults !== undefined) setAnalyzeTestResults(updates.testResults);
+              if (updates.allTestsPassed !== undefined) setAnalyzeAllTestsPassed(updates.allTestsPassed);
             }}
           />
         );
@@ -212,7 +291,6 @@ user123+tag@site.org
           </div>
           <div className="flex items-center gap-4 text-xs">
             <span>Ctrl+Enter: Generate | Enter: Analyze</span>
-            <span>Made with ❤️ using AI-powered regex generation</span>
           </div>
         </div>
       </footer>
