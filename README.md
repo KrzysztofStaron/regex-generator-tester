@@ -2,11 +2,6 @@
 
 A powerful, AI-powered regex pattern generator and testing tool built with Next.js, TypeScript, and Tailwind CSS. Create, test, and understand regular expressions with intelligent assistance.
 
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/KrzysztofStaron/regex-generator-tester)
-![Regex Generator Tester](https://img.shields.io/badge/Next.js-15.4.5-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
-
 ## 🎬 Demo
 
 See the Regex Generator Tester in action! Watch our demo video to see how easy it is to create, test, and understand regex patterns with AI assistance.
@@ -14,7 +9,7 @@ See the Regex Generator Tester in action! Watch our demo video to see how easy i
 [![Watch Demo](https://img.shields.io/badge/Watch_Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/KrzysztofStaron/regex-generator-tester/raw/main/public/demo.mp4)
 
 **Or download the demo video directly:**
-[📥 Download Demo (MP4)](https://github.com/KrzysztofStaron/regex-generator-tester/raw/main/public/demo.mp4)
+[📥 Download Demo (MP4)](public/demo.mp4)
 
 ## ✨ Features
 
