@@ -46,6 +46,8 @@ export default function LandingPage() {
               <Link
                 href="https://github.com/KrzysztofStaron/regex-generator-tester"
                 className="flex items-center space-x-2"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <Github className="w-4 h-4" />
                 <span>GitHub</span>
@@ -96,22 +98,6 @@ export default function LandingPage() {
               <Play className="w-5 h-5 mr-2" />
               View Demo
             </Button>
-          </div>
-
-          {/* Tech Stack Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-16">
-            <Badge variant="outline" className="border-zinc-700 text-zinc-400">
-              Next.js 15.4.5
-            </Badge>
-            <Badge variant="outline" className="border-zinc-700 text-zinc-400">
-              TypeScript 5.0
-            </Badge>
-            <Badge variant="outline" className="border-zinc-700 text-zinc-400">
-              Tailwind CSS 3.4
-            </Badge>
-            <Badge variant="outline" className="border-zinc-700 text-zinc-400">
-              OpenAI API
-            </Badge>
           </div>
 
           {/* App Screenshot */}
@@ -269,6 +255,8 @@ export default function LandingPage() {
               <Link
                 href="https://github.com/KrzysztofStaron/regex-generator-tester"
                 className="flex items-center space-x-2"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <Star className="w-5 h-5" />
                 <span>Star on GitHub</span>
