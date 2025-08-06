@@ -306,7 +306,10 @@ export default function LandingPage() {
             {/* Video */}
             <div className="p-6">
               <video controls className="w-full rounded-lg" autoPlay muted>
-                <source src="/demo.mp4" type="video/mp4" />
+                <source
+                  src="https://sif1zatsxq.ufs.sh/f/jSQcP3yxNjoauyhOB8JTbBZRYfqJnA6724oS3GEMz1kIOCmh"
+                  type="video/mp4"
+                />
                 Your browser does not support the video tag.
               </video>
             </div>
