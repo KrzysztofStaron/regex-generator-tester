@@ -14,9 +14,9 @@ const buttonVariants = cva(
         destructive:
           "bg-gradient-to-r from-red-600 via-red-700 to-red-800 border border-red-500/50 text-white hover:from-red-500 hover:via-red-600 hover:to-red-700 hover:text-white",
         outline:
-          "bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 border border-zinc-600/50 text-zinc-200 hover:from-zinc-700 hover:via-zinc-600 hover:to-zinc-700 hover:text-white",
+          "bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 border border-zinc-600/50 text-zinc-100 hover:from-zinc-700 hover:via-zinc-600 hover:to-zinc-700 hover:text-white",
         secondary:
-          "bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700 border border-zinc-500/50 text-zinc-200 hover:from-zinc-600 hover:via-zinc-500 hover:to-zinc-600 hover:text-white",
+          "bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700 border border-zinc-500/50 text-zinc-100 hover:from-zinc-600 hover:via-zinc-500 hover:to-zinc-600 hover:text-white",
         ghost: "bg-transparent border border-transparent text-zinc-300 hover:bg-zinc-800/50 hover:text-white",
         link: "text-blue-400 underline-offset-4 hover:underline hover:text-blue-300",
         success:

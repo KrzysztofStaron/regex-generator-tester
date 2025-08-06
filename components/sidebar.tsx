@@ -24,16 +24,16 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       group: "Tools",
       items: [
         {
-          id: "sandbox",
-          label: "Interactive Sandbox",
-          icon: Play,
-          description: "Test and refine",
-        },
-        {
           id: "analyze",
           label: "Analyze Regex",
           icon: Search,
           description: "Reverse mode",
+        },
+        {
+          id: "sandbox",
+          label: "Interactive Sandbox",
+          icon: Play,
+          description: "Test and refine",
         },
       ],
     },

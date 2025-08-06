@@ -18,9 +18,23 @@ import {
   ChevronUp,
   Save,
   Bookmark,
+  CheckCircle,
+  XCircle,
+  Plus,
+  X,
+  RotateCcw,
+  TestTube,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RegexHighlighter } from "@/components/regex-highlighter";
+
+interface TestCase {
+  id: string;
+  text: string;
+  isValid: boolean;
+  actualResult?: boolean;
+  passed?: boolean;
+}
 
 interface InteractiveSandboxProps {
   state: {
@@ -30,12 +44,23 @@ interface InteractiveSandboxProps {
     error: string;
     showQuickActions: boolean;
     savedPatterns: Array<{ name: string; regex: string; testText: string }>;
+    testCases: TestCase[];
+    showTestCases: boolean;
   };
   updateState: (updates: Partial<InteractiveSandboxProps["state"]>) => void;
 }
 
 export function InteractiveSandbox({ state, updateState }: InteractiveSandboxProps) {
-  const { regex, testText, matches, error, showQuickActions, savedPatterns } = state;
+  const {
+    regex,
+    testText,
+    matches,
+    error,
+    showQuickActions,
+    savedPatterns,
+    testCases = [],
+    showTestCases = false,
+  } = state;
 
   const setRegex = (value: string) => updateState({ regex: value });
   const setTestText = (value: string) => updateState({ testText: value });
@@ -45,6 +70,8 @@ export function InteractiveSandbox({ state, updateState }: InteractiveSandboxPro
   const setShowQuickActions = (value: boolean) => updateState({ showQuickActions: value });
   const setSavedPatterns = (value: Array<{ name: string; regex: string; testText: string }>) =>
     updateState({ savedPatterns: value });
+  const setTestCases = (value: TestCase[]) => updateState({ testCases: value });
+  const setShowTestCases = (value: boolean) => updateState({ showTestCases: value });
 
   // Check for regex from other tabs
   useEffect(() => {
@@ -65,6 +92,17 @@ export function InteractiveSandbox({ state, updateState }: InteractiveSandboxPro
   useEffect(() => {
     testRegex();
   }, [regex, testText]);
+
+  useEffect(() => {
+    if (testCases.length > 0 && regex.trim()) {
+      // Use a timeout to debounce the test case running
+      const timeoutId = setTimeout(() => {
+        runTestCases();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [regex, testCases.length, ...testCases.map(tc => tc.text + tc.isValid)]);
 
   const testRegex = () => {
     setError("");
@@ -89,6 +127,85 @@ export function InteractiveSandbox({ state, updateState }: InteractiveSandboxPro
     } catch (err) {
       setError("Invalid regex pattern");
     }
+  };
+
+  const runTestCases = () => {
+    if (!regex.trim() || testCases.length === 0) return;
+
+    try {
+      const regexObj = new RegExp(regex);
+      const updatedTestCases = testCases.map(testCase => {
+        if (!testCase.text.trim()) {
+          return { ...testCase, actualResult: undefined, passed: undefined };
+        }
+
+        const actualResult = regexObj.test(testCase.text);
+        const passed = actualResult === testCase.isValid;
+
+        return {
+          ...testCase,
+          actualResult,
+          passed,
+        };
+      });
+
+      // Only update if there's actually a change to avoid infinite loops
+      const hasChanges = testCases.some((tc, index) => {
+        const updated = updatedTestCases[index];
+        return tc.actualResult !== updated.actualResult || tc.passed !== updated.passed;
+      });
+
+      if (hasChanges) {
+        setTestCases(updatedTestCases);
+      }
+    } catch (err) {
+      // Handle regex error - clear test results
+      const clearedTestCases = testCases.map(tc => ({
+        ...tc,
+        actualResult: undefined,
+        passed: undefined,
+      }));
+      setTestCases(clearedTestCases);
+    }
+  };
+
+  const addTestCase = (isValid: boolean) => {
+    const newTest: TestCase = {
+      id: Date.now().toString(),
+      text: "",
+      isValid,
+    };
+    setTestCases([...testCases, newTest]);
+  };
+
+  const editTestCase = (id: string, text: string) => {
+    const updatedTestCases = testCases.map(tc => (tc.id === id ? { ...tc, text } : tc));
+    setTestCases(updatedTestCases);
+  };
+
+  const toggleTestValidity = (id: string) => {
+    const updatedTestCases = testCases.map(tc => (tc.id === id ? { ...tc, isValid: !tc.isValid } : tc));
+    setTestCases(updatedTestCases);
+  };
+
+  const deleteTestCase = (id: string) => {
+    const updatedTestCases = testCases.filter(tc => tc.id !== id);
+    setTestCases(updatedTestCases);
+  };
+
+  const clearAllTestCases = () => {
+    setTestCases([]);
+  };
+
+  const addQuickTestCases = () => {
+    const quickTests: TestCase[] = [
+      { id: "1", text: "test@example.com", isValid: true },
+      { id: "2", text: "invalid.email", isValid: false },
+      { id: "3", text: "user@domain.co.uk", isValid: true },
+      { id: "4", text: "@invalid.com", isValid: false },
+    ];
+    setTestCases(quickTests);
+    toast.success("Quick test cases added!");
   };
 
   const highlightMatches = (text: string) => {
@@ -153,15 +270,26 @@ export function InteractiveSandbox({ state, updateState }: InteractiveSandboxPro
             <h1 className="text-3xl font-bold text-white mb-2">Interactive Regex Sandbox</h1>
             <p className="text-zinc-400">Test and refine your regex patterns in real-time</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowQuickActions(!showQuickActions)}
-            className="text-zinc-400 hover:text-white"
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Quick Actions
-            {showQuickActions ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowTestCases(!showTestCases)}
+              className="text-zinc-400 hover:text-white"
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              Test Cases
+              {showTestCases ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowQuickActions(!showQuickActions)}
+              className="text-zinc-400 hover:text-white"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              Quick Actions
+              {showQuickActions ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+            </Button>
+          </div>
         </div>
 
         {showQuickActions && (
@@ -220,6 +348,137 @@ export function InteractiveSandbox({ state, updateState }: InteractiveSandboxPro
                   ))}
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {showTestCases && (
+          <div className="mt-4 p-4 bg-zinc-800/50 backdrop-blur-sm rounded-lg border border-zinc-700/50">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-medium">Test Cases</h3>
+              <div className="flex gap-2">
+                <Button variant="success" size="sm" onClick={() => addTestCase(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Valid Test
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => addTestCase(false)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Invalid Test
+                </Button>
+                {testCases.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearAllTestCases}>
+                    <X className="w-4 h-4 mr-2" />
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {testCases.length > 0 && (
+              <>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                  {testCases.map(testCase => (
+                    <Card key={testCase.id} className="bg-zinc-900/40 backdrop-blur-sm border-zinc-800/50">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex flex-col gap-1">
+                            <Badge
+                              variant="outline"
+                              className={
+                                testCase.isValid ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                              }
+                            >
+                              {testCase.isValid ? "✓ Should Match" : "✗ Should NOT Match"}
+                            </Badge>
+                            {testCase.actualResult !== undefined && (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  testCase.passed ? "border-green-500 text-green-400" : "border-red-500 text-red-400"
+                                }
+                              >
+                                {testCase.passed ? "✓ PASS" : "✗ FAIL"}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleTestValidity(testCase.id)}
+                              className="p-1 h-6 w-6"
+                              title="Toggle validity"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteTestCase(testCase.id)}
+                              className="p-1 h-6 w-6"
+                              title="Delete test case"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <Input
+                          placeholder="Enter test text..."
+                          value={testCase.text}
+                          onChange={e => editTestCase(testCase.id, e.target.value)}
+                          className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 font-mono text-sm"
+                        />
+                        {testCase.actualResult !== undefined && (
+                          <div className="mt-2 text-xs text-zinc-400">
+                            Expected: {testCase.isValid ? "Match" : "No Match"} | Actual:{" "}
+                            {testCase.actualResult ? "Match" : "No Match"}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Test Results Summary */}
+                {testCases.length > 0 && testCases.some(tc => tc.actualResult !== undefined) && (
+                  <div className="p-3 bg-zinc-900/50 backdrop-blur-sm rounded-lg border border-zinc-700/50">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-white font-medium">Test Results Summary</h4>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          <span className="text-green-400 text-sm">
+                            {testCases.filter(tc => tc.passed).length} Passed
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <XCircle className="w-4 h-4 text-red-400" />
+                          <span className="text-red-400 text-sm">
+                            {testCases.filter(tc => tc.passed === false).length} Failed
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            testCases.every(tc => tc.passed)
+                              ? "border-green-500 text-green-400"
+                              : "border-red-500 text-red-400"
+                          }
+                        >
+                          {testCases.every(tc => tc.passed) ? "All Tests Pass" : "Some Tests Failed"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {testCases.length === 0 && (
+              <div className="text-center py-8 text-zinc-400">
+                <TestTube className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No test cases yet. Add some test cases to validate your regex pattern.</p>
+              </div>
             )}
           </div>
         )}

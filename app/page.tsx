@@ -80,6 +80,8 @@ user123+tag@site.org
   const [sandboxError, setSandboxError] = useState("");
   const [sandboxShowQuickActions, setSandboxShowQuickActions] = useState(false);
   const [sandboxSavedPatterns, setSandboxSavedPatterns] = useState<any[]>([]);
+  const [sandboxTestCases, setSandboxTestCases] = useState<any[]>([]);
+  const [sandboxShowTestCases, setSandboxShowTestCases] = useState(false);
 
   // Library tab state
   const [librarySearchTerm, setLibrarySearchTerm] = useState("");
@@ -217,6 +219,8 @@ user123+tag@site.org
               error: sandboxError,
               showQuickActions: sandboxShowQuickActions,
               savedPatterns: sandboxSavedPatterns,
+              testCases: sandboxTestCases,
+              showTestCases: sandboxShowTestCases,
             }}
             updateState={updates => {
               if (updates.regex !== undefined) setSandboxRegex(updates.regex);
@@ -225,6 +229,8 @@ user123+tag@site.org
               if (updates.error !== undefined) setSandboxError(updates.error);
               if (updates.showQuickActions !== undefined) setSandboxShowQuickActions(updates.showQuickActions);
               if (updates.savedPatterns !== undefined) setSandboxSavedPatterns(updates.savedPatterns);
+              if (updates.testCases !== undefined) setSandboxTestCases(updates.testCases);
+              if (updates.showTestCases !== undefined) setSandboxShowTestCases(updates.showTestCases);
             }}
           />
         );
