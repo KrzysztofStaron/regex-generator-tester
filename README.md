@@ -6,7 +6,7 @@ A powerful, AI-powered regex pattern generator and testing tool built with Next.
 
 See the Regex Generator Tester in action! Watch our demo video to see how easy it is to create, test, and understand regex patterns with AI assistance.
 
-[![Watch the video](/public/thumbnail.png)](https://sif1zatsxq.ufs.sh/f/jSQcP3yxNjoauyhOB8JTbBZRYfqJnA6724oS3GEMz1kIOCmh)
+https://github.com/KrzysztofStaron/regex-generator-tester/blob/master/public/demo.mp4
 
 ## ✨ Features
 
