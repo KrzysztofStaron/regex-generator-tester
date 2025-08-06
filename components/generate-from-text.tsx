@@ -50,14 +50,16 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
   const setIsGenerating = (value: boolean) => updateState({ isGenerating: value });
   const setGenerationSteps = (value: GenerationStep[]) => updateState({ generationSteps: value });
 
-  const generateRegex = async () => {
+  const generateRegex = async (isRetry = false) => {
     if (!description.trim()) return;
 
     setIsGenerating(true);
-    setGeneratedRegex("");
-    setExplanation("");
-    setTestCases([]);
-    setGenerationSteps([]);
+    if (!isRetry) {
+      setGeneratedRegex("");
+      setExplanation("");
+      setTestCases([]);
+      setGenerationSteps([]);
+    }
 
     try {
       const result = await generateRegexWithRetryAction(description);
@@ -72,14 +74,37 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
           actualResult: test.actualResult,
         }))
       );
-      setGenerationSteps(result.steps);
+      setGenerationSteps(
+        result.steps.map(step => ({
+          ...step,
+          testCases: step.testCases.map((tc, index) => ({
+            id: (index + 1).toString(),
+            ...tc,
+          })),
+        }))
+      );
     } catch (error) {
-      toast.error("Failed to generate regex. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      if (errorMessage.includes("API")) {
+        toast.error("AI service unavailable. Please check your connection and try again.");
+      } else if (errorMessage.includes("timeout")) {
+        toast.error("Request timed out. Please try again with a simpler description.");
+      } else {
+        toast.error(`Failed to generate regex: ${errorMessage}`);
+      }
       console.error("Generation error:", error);
+
+      // Add error state to show user feedback
+      setExplanation("❌ Generation failed. Please try again or simplify your description.");
     } finally {
       setIsGenerating(false);
     }
   };
+
+  const hasFailedTests = testCases.some(tc => tc.actualResult !== tc.isValid);
+  const finalStep = generationSteps[generationSteps.length - 1];
+  const shouldShowRetry = hasFailedTests && finalStep?.status === "failed";
+  const allTestsPassed = testCases.length > 0 && !hasFailedTests;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(generatedRegex);
@@ -156,7 +181,7 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
               className="bg-zinc-800/50 backdrop-blur-sm border-zinc-700/50 text-white placeholder:text-zinc-500 min-h-[100px] resize-none"
             />
             <div className="flex gap-2 items-center">
-              <Button variant="default" onClick={generateRegex} disabled={!description.trim() || isGenerating}>
+              <Button variant="default" onClick={() => generateRegex()} disabled={!description.trim() || isGenerating}>
                 <Sparkles className="w-4 h-4 mr-2" />
                 {isGenerating ? "Generating..." : "Generate Regex"}
               </Button>
@@ -206,7 +231,35 @@ export function GenerateFromText({ state, updateState }: GenerateFromTextProps) 
                   </Button>
                 </div>
                 <p className="text-zinc-300 text-sm">{explanation}</p>
+                {allTestsPassed && (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
+                      <CheckCircle className="w-4 h-4" />
+                      All test cases passed!
+                    </div>
+                    <p className="text-green-300 text-xs mt-1">
+                      Your regex is working correctly with all generated test cases.
+                    </p>
+                  </div>
+                )}
+                {shouldShowRetry && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-400 text-sm font-medium">
+                      <XCircle className="w-4 h-4" />
+                      Some test cases failed
+                    </div>
+                    <p className="text-red-300 text-xs mt-1">
+                      The generated regex doesn't pass all test cases. Click "Retry Generation" to improve it.
+                    </p>
+                  </div>
+                )}
                 <div className="flex gap-2">
+                  {shouldShowRetry && (
+                    <Button variant="destructive" size="sm" onClick={() => generateRegex(true)} disabled={isGenerating}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      {isGenerating ? "Retrying..." : "Retry Generation"}
+                    </Button>
+                  )}
                   <Button
                     variant="info"
                     size="sm"

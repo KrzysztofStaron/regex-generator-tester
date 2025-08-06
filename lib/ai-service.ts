@@ -47,27 +47,36 @@ export async function generateRegexFromDescriptionWithRetry(
 ): Promise<{ steps: GenerationStep[]; finalResult: RegexGeneration }> {
   const steps: GenerationStep[] = [];
   let currentStep = 1;
+  let previousFailures: string[] = [];
 
   while (currentStep <= maxRetries) {
     try {
+      const contextMessage =
+        currentStep > 1
+          ? `Previous attempts failed. Problems encountered:\n${previousFailures.join(
+              "\n"
+            )}\n\nImprove the regex to address these issues.`
+          : "";
+
       const response = await openai.chat.completions.create({
         model: "anthropic/claude-3.5-sonnet",
         messages: [
           {
             role: "system",
             content: `You are a regex expert. Generate regex patterns based on natural language descriptions. 
-            ${
-              currentStep > 1
-                ? `Previous attempt failed ${currentStep - 1} test(s). Please improve the regex to pass all tests.`
-                : ""
-            }
+            ${contextMessage}
             Return a JSON object with:
             - regex: the regex pattern (escaped for JavaScript)
             - explanation: plain English explanation
-            - testCases: array of {text, isValid} objects (3 valid, 3 invalid examples)
+            - testCases: array of {text, isValid} objects (4 valid, 4 invalid examples that test edge cases)
             - confidence: number 0-100
             
-            Focus on practical, commonly used patterns.`,
+            For test cases, include:
+            - Basic valid examples
+            - Edge cases that should match
+            - Common invalid variations
+            - Boundary cases
+            Focus on practical, commonly used patterns. Make sure the regex actually works with your test cases.`,
           },
           {
             role: "user",
@@ -85,28 +94,42 @@ export async function generateRegexFromDescriptionWithRetry(
 
       // Validate test cases against the generated regex
       let failedTests = 0;
+      let failureReasons: string[] = [];
+
       if (result.testCases && Array.isArray(result.testCases)) {
         try {
           const regex = new RegExp(result.regex);
           result.testCases = result.testCases.map(testCase => {
             const actualResult = regex.test(testCase.text);
-            const isValid = testCase.isValid === actualResult;
-            if (!isValid) failedTests++;
+            const isCorrect = testCase.isValid === actualResult;
+            if (!isCorrect) {
+              failedTests++;
+              failureReasons.push(
+                `Expected "${testCase.text}" to ${testCase.isValid ? "match" : "not match"} but it ${
+                  actualResult ? "matched" : "did not match"
+                }`
+              );
+            }
             return {
               ...testCase,
               actualResult,
-              isValid,
+              isValid: testCase.isValid, // Keep original expectation
             };
           });
         } catch (regexError) {
           console.warn("Invalid regex generated:", result.regex, regexError);
+          failureReasons.push(`Invalid regex syntax: ${regexError.message}`);
           result.testCases = result.testCases.map(testCase => ({
             ...testCase,
             actualResult: false,
-            isValid: false,
           }));
           failedTests = result.testCases.length;
         }
+      }
+
+      // Add failure reasons to context for next retry
+      if (failureReasons.length > 0) {
+        previousFailures = previousFailures.concat(failureReasons);
       }
 
       const step: GenerationStep = {
@@ -234,14 +257,12 @@ export async function generateRegexFromExamples(
         result.testCases = result.testCases.map(testCase => ({
           ...testCase,
           actualResult: regex.test(testCase.text),
-          isValid: testCase.isValid === regex.test(testCase.text),
         }));
       } catch (regexError) {
         console.warn("Invalid regex generated:", result.regex, regexError);
         result.testCases = result.testCases.map(testCase => ({
           ...testCase,
           actualResult: false,
-          isValid: false,
         }));
       }
     }
